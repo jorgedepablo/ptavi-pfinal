@@ -15,8 +15,22 @@ try:
 except (IndexError, ValueError):
     sys.exit('Usage: aclient.py config method option')
 
+def register():
+    print('lo del register')
+
 # Content to send
-LINE = METHOD + ' sip:' + LOGIN + '@' + SERVER + ' SIP/2.0\r\n'
+try:
+    if METHOD = 'REGISTER':
+        register()
+    elif METHOD = 'INVITE':
+        print('lo del invite')
+    elif METHOD = 'BYE':
+        print('lo del bye')
+    else:
+        exit('Usage: method not avaleible')
+except (IndexError, ValueError):
+    exit('Usage: aclient.py config method option')
+
 
 # Create the socket, configure it and attach it to server/port
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:

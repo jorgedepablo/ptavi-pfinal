@@ -1,0 +1,8 @@
+<config>
+    <account username="iron_man@avengers.com" passwd="T0nySt4rk"/>
+    <uaserver ip="localhost" puerto="9001"/>
+    <rtpaudio puerto="6278"/>
+    <regproxy ip="localhost" puerto="6785"/>
+    <log path="ua1.log"/>
+    <audio path="cancion.mp3"/>
+</config>

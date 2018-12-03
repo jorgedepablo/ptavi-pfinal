@@ -1,0 +1,8 @@
+<config>
+    <account username="captain_america@avengers.com" passwd="St3veR0gers"/>
+    <uaserver ip="localhost" puerto="9002"/>
+    <rtpaudio puerto="5487"/>
+    <regproxy ip="localhost" puerto="7012"/>
+    <log path="ua2.log"/>
+    <audio path="cancion.mp3"/>
+</config>
