@@ -30,15 +30,15 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         """Add users to the dictionary."""
         self.dict_Users[sip_address] = self.client_address[0] + ' Expires: '\
                                                               + expires_time
-        self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+        self.wfile.write(OK)
 
     def del_user(self, sip_address):
         """Delete users of the dictionary."""
         try:
             del self.dict_Users[sip_address]
-            self.wfile.write(b'SIP/2.0 200 OK\r\n\r\n')
+            self.wfile.write(OK)
         except KeyError:
-            self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+            self.wfile.write(BAD_REQUEST)
 
     def check_expires(self):
         """Check if the users have expired, delete them of the dictionary."""
@@ -61,7 +61,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                 if received_mess[0] == 'REGISTER':
                     sip_address = received_mess[1].split(':')[1]
                 else:
-                    self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+                    self.wfile.write(BAD_REQUEST)
             elif index == 1:
                 if received_mess[0] == 'Expires:':
                     expires_time = float(received_mess[1])
@@ -73,7 +73,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                     elif expires_time == 0:
                         self.del_user(sip_address)
                 else:
-                    self.wfile.write(b'SIP/2.0 400 Bad Request\r\n\r\n')
+                    self.wfile.write(BAD_REQUEST)
             elif index == 2:
                 if received_mess[0] == 'Authorization:':
 
@@ -81,10 +81,11 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
 
 class EchoHandler(socketserver.DatagramRequestHandler):
     """Echo server class."""
+    def __init__(self):
+        self.correct = True
 
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
-        self.correct = True
         valid_characters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
                             'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
                             'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
