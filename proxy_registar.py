@@ -6,6 +6,15 @@ import socketserver
 import sys
 import time
 import json
+from xml.sax import make_parser
+from xml.sax.handler import CountentHandler
+
+class SmallXMLHandler(CountentHandler):
+
+    def __init__(self): 
+        self.tags = []
+
+
 
 
 class SIPRegisterHandler(socketserver.DatagramRequestHandler):
@@ -84,12 +93,12 @@ if __name__ == "__main__":
     # Listens at localhost ('') in a port defined by the user
     # and calls the SIPRegisterHandler class to manage the request
     try:
-        PORT = int(sys.argv[1])
+        CONFIG = sys.argv[1]
         serv = socketserver.UDPServer(('', PORT), SIPRegisterHandler)
     except IndexError or ValueError:
-        sys.exit('Usage: python3 server.py "port"')
+        sys.exit('Usage: python3 proxy_registar.py config.')
 
-    print('Runnig echo server UDP...')
+    print('Server AvengersServer listening at port 5555...')
     try:
         serv.serve_forever()
     except KeyboardInterrupt:
