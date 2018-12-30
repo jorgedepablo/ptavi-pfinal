@@ -5,25 +5,17 @@
 import socket
 import sys
 import socketserver
-import time
+from xml.sax import make_parser
+from xml.sax.handler import ContentHandler
+from proxy_registar import XMLHandler
 
 # UA Client UDP simple.
-
-# Pick config, method and option of keyboard.
-try:
-    CONFIG = sys.argv[1]
-    METHOD = sys.argv[2]
-    OPTION = sys.argv[3]
-except (IndexError, ValueError):
-    sys.exit('Usage: aclient.py config method option')
-
 header = []
 PSW = 'hacer aqui lo del response con el nonce'
-
 # Content to send
 def register(authentication):
-    Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT  + ' SIP/2.0\r\n\r\n')
-    header[0] = 'Expires: ' OPTION + '\r\n\r\n'
+    Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT  + ' SIP/2.0\r\n\r\n'
+    header[0] = 'Expires: ' + OPTION + '\r\n\r\n'
     if authentication:
         header[1] = 'Authorization: Digest response="' + PSW + '"\r\n\r\n'
 
@@ -53,6 +45,19 @@ def send_mess(Request, header):
 
 
 if __name__ == '__main__':
+    parser = make_parser()
+    cHandler = XMLHandler()
+    parser.setContentHandler(cHandler)
+    # Pick config, method and option of keyboard.
+    try:
+        CONFIG = sys.argv[1]
+        METHOD = sys.argv[2]
+        OPTION = sys.argv[3]
+        parser.parse(open(CONFIG))
+        #LOGIN = cHandler.config
+    except (IndexError, ValueError, FileNotFoundError):
+        sys.exit('Usage: aclient.py config method option')
+
     try:
         if METHOD == 'REGISTER':
             authentication = False
