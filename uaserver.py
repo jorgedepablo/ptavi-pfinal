@@ -5,8 +5,8 @@
 import socketserver
 import sys
 import os
-rom xml.sax import make_parser
-from xml.sax.handler import CountentHandler
+from xml.sax import make_parser
+from xml.sax.handler import ContentHandler
 from proxy_registar import XMLHandler
 
 
@@ -96,6 +96,15 @@ if __name__ == "__main__":
     try:
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
+        LOGIN = cHandler.config['account_username']
+        PASSWD = cHandler.config['account_passwd']
+        SERVER_IP = cHandler.config['uaserver_ip']
+        SERVER_PORT = int(cHandler.config['uaserver_port'])
+        RTP_PORT = int(cHandler.config['rtpaudio_port'])
+        PROXY_IP = cHandler.config['regproxy_ip']
+        PROXY_PORT = int(cHandler.config['regproxy_port'])
+        FICH_LOG = cHandler.config['log_path']
+        MEDIA = cHandler.config['audio_path']
     except (IndexError, ValueError):
         sys.exit('Usage: python uaserver.py config')
 

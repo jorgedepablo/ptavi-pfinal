@@ -24,7 +24,7 @@ class XMLHandler(ContentHandler):
                           'rtpaudio': ['port'],
                           'regproxy': ['ip', 'port'],
                           'log': ['path'],
-                          'aduio': ['path'],
+                          'audio': ['path'],
                           'server': ['name', 'ip', 'port'],
                           'database': ['path', 'passwdpath']}
         self.config = {}
@@ -112,6 +112,12 @@ if __name__ == "__main__":
     try:
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
+        SERVER_NAME = cHandler.config['server_name']
+        SERVER_IP = cHandler.config['server_ip']
+        SERVER_PORT = int(cHandler.config['server_port'])
+        DATA_USERS = cHandler.config['database_path']
+        DATA_PASSWD = cHandler.config['database_passwdpath']
+        FICH_LOG = cHandler.config['log_path']
         #serv = socketserver.UDPServer(('', PORT), SIPRegisterHandler)
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: python3 proxy_registar.py config.')

@@ -14,7 +14,7 @@ header = []
 PSW = 'hacer aqui lo del response con el nonce'
 # Content to send
 def register(authentication):
-    Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT  + ' SIP/2.0\r\n\r\n'
+    Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT + ' SIP/2.0\r\n\r\n'
     header[0] = 'Expires: ' + OPTION + '\r\n\r\n'
     if authentication:
         header[1] = 'Authorization: Digest response="' + PSW + '"\r\n\r\n'
@@ -24,7 +24,7 @@ def invite():
     header[0] = 'Content-Type: application/sdp\r\n\r\n'
     header[1] = 'v=0\r\n\r\n'
     header[2] = 'o=' + OPTION + ' ' + PROXY_IP + '\r\n\r\n'
-    header[3] = 's=misesion\r\n\r\n'
+    header[3] = 's=avengers_assemmble\r\n\r\n'
     header[4] = 't=0\r\n\r\n'
     header[5] = 'm=audio ' + PROXY_PORT + ' RTP\r\n\r\n'
 
@@ -54,22 +54,31 @@ if __name__ == '__main__':
         METHOD = sys.argv[2]
         OPTION = sys.argv[3]
         parser.parse(open(CONFIG))
-        #LOGIN = cHandler.config
-    except (IndexError, ValueError, FileNotFoundError):
-        sys.exit('Usage: aclient.py config method option')
 
-    try:
-        if METHOD == 'REGISTER':
-            authentication = False
-            register(authentication)
-        elif METHOD == 'INVITE':
-            invite()
-        elif METHOD == 'BYE':
-            bye()
-        else:
-            exit('Usage: method not avaleible')
-    except (IndexError, ValueError):
-        exit('Usage: aclient.py config method option')
+    except (IndexError, ValueError, FileNotFoundError):
+        sys.exit('Usage: uaclient.py config method option')
+
+    LOGIN = cHandler.config['account_username']
+    PASSWD = cHandler.config['account_passwd']
+    SERVER_IP = cHandler.config['uaserver_ip']
+    SERVER_PORT = int(cHandler.config['uaserver_port'])
+    RTP_PORT = int(cHandler.config['rtpaudio_port'])
+    PROXY_IP = cHandler.config['regproxy_ip']
+    PROXY_PORT = int(cHandler.config['regproxy_port'])
+    FICH_LOG = cHandler.config['log_path']
+    MEDIA = cHandler.config['audio_path']
+
+    if METHOD == 'REGISTER':
+        authentication = False
+        register(authentication)
+    elif METHOD == 'INVITE':
+        invite()
+    elif METHOD == 'BYE':
+        #AL PARECER AQUI NO LLENA LAS VARIABLES, VAYA PUTA MIERDA
+        bye()
+    else:
+        exit('Usage: method not avaleible')
+
 
     # Create the socket, configure it and attach it to server/port
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
