@@ -2,7 +2,7 @@
     <account username="iron_man@avengers.com" passwd="T0nySt4rk"/>
     <uaserver ip="localhost" port="9001"/>
     <rtpaudio port="6278"/>
-    <regproxy ip="localhost" port="6785"/>
+    <regproxy ip="localhost" port="5555"/>
     <log path="ua1.log"/>
     <audio path="cancion.mp3"/>
 </config>

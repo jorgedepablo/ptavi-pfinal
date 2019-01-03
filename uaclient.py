@@ -12,28 +12,6 @@ from proxy_registar import XMLHandler
 # UA Client UDP simple.
 header = []
 PSW = 'hacer aqui lo del response con el nonce'
-# Content to send
-def register(authentication):
-    Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT + ' SIP/2.0\r\n\r\n'
-    header[0] = 'Expires: ' + OPTION + '\r\n\r\n'
-    if authentication:
-        header[1] = 'Authorization: Digest response="' + PSW + '"\r\n\r\n'
-
-def invite():
-    Request = 'INVITE sip:' + LOGIN + 'SIP/2.0\r\n\r\n'
-    header[0] = 'Content-Type: application/sdp\r\n\r\n'
-    header[1] = 'v=0\r\n\r\n'
-    header[2] = 'o=' + OPTION + ' ' + PROXY_IP + '\r\n\r\n'
-    header[3] = 's=avengers_assemmble\r\n\r\n'
-    header[4] = 't=0\r\n\r\n'
-    header[5] = 'm=audio ' + PROXY_PORT + ' RTP\r\n\r\n'
-
-def ack():
-    header = [] #ESTO BORRA LA LISTA?
-    Request = 'ACK sip:' + LOGIN + ' SIP/2.0\r\n\r\n'
-
-def bye():
-    Request = 'BYE sip:' + LOGIN + ' SIP/2.0\r\n\r\n'
 
 # procedure to send messages
 def send_mess(Request, header):
@@ -69,16 +47,21 @@ if __name__ == '__main__':
     MEDIA = cHandler.config['audio_path']
 
     if METHOD == 'REGISTER':
-        authentication = False
-        register(authentication)
+        Request = 'REGISTER sip:' + LOGIN + ':' + str(SERVER_PORT) + ' SIP/2.0\r\n\r\n'
+        header.append('Expires: ' + OPTION + '\r\n\r\n')
     elif METHOD == 'INVITE':
-        invite()
+        Request = 'INVITE sip:' + OPTION + 'SIP/2.0\r\n\r\n'
+        header[0] = 'Content-Type: application/sdp\r\n\r\n'
+        header[1] = '\r\n\r\n'
+        header[2] = 'v=0\r\n\r\n'
+        header[3] = 'o=' + LOGIN + ' ' + SERVER_IP + '\r\n\r\n'
+        header[4] = 's=avengers_assemmble\r\n\r\n'
+        header[5] = 't=0\r\n\r\n'
+        header[6] = 'm=audio ' + RTP_PORT + ' RTP\r\n\r\n'
     elif METHOD == 'BYE':
-        #AL PARECER AQUI NO LLENA LAS VARIABLES, VAYA PUTA MIERDA
-        bye()
+        Request = 'BYE sip:' + OPTION + ' SIP/2.0\r\n\r\n'
     else:
         exit('Usage: method not avaleible')
-
 
     # Create the socket, configure it and attach it to server/port
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
@@ -90,11 +73,14 @@ if __name__ == '__main__':
         RESPONSE = data.decode('utf-8')
         print(RESPONSE)
         if RESPONSE.split()[1] == '401':   #probar lo de las respuestas estas de gregorio
-            authentication = True
-            register(authentication)
+            header = []
+            Request = 'REGISTER sip:' + LOGIN + ':' + SERVER_PORT + ' SIP/2.0\r\n\r\n'
+            header.append('Expires: ' + OPTION + '\r\n\r\n')
+            header.append('Authorization: Digest response="' + PSW + '"\r\n\r\n')
             send_mess(Request, header)
         if RESPONSE.split()[1] == '100':
-            ack()
+            header = [] #ESTO BORRA LA LISTA?
+            Request = 'ACK sip:' + LOGIN + ' SIP/2.0\r\n\r\n'
             send_mess(Request, header)
         print('Ending socket...')
 

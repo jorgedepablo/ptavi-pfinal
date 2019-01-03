@@ -41,7 +41,9 @@ class XMLHandler(ContentHandler):
 class SIPRegisterHandler(socketserver.DatagramRequestHandler):
     """Echo register server class."""
 
-    dict_Users = {}
+    def __init__(self):
+        self.dict_Users = {}
+        self.authorization = False
 
     def add_user(self, sip_address, expires_time, nonce):
         """Add users to the dictionary."""
@@ -69,6 +71,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         """Handle method of the server class."""
         self.check_expires()
         received_mess = []
+        self.authorization = False
         for index, line in enumerate(self.rfile):
             received_mess = line.decode('utf-8')
             received_mess = ''.join(received_mess).split()
@@ -94,13 +97,19 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
                     if received_mess[1] == 'Digest':
                         if received_mess[2].split('=')[0] == 'response':
                             nonce = received_mess[2].split('=')[1]
-                            self.add_user(sip_address, expires_time, nonce)
+                            #HACER QUE PASE LA CONTRASEÑA
+                            authorization = True
                         else:
                             self.wfile.write(BAD_REQUEST)
                     else:
                         self.wfile.write(BAD_REQUEST)
                 else:
                     self.wfile.write(BAD_REQUEST)
+
+        if not self.authorization:
+            self.wfile.write(UNAUTHORIZED)
+        else:
+            self.add_user(sip_address, expires_time, nonce)
 
 
 if __name__ == "__main__":
@@ -118,11 +127,11 @@ if __name__ == "__main__":
         DATA_USERS = cHandler.config['database_path']
         DATA_PASSWD = cHandler.config['database_passwdpath']
         FICH_LOG = cHandler.config['log_path']
-        #serv = socketserver.UDPServer(('', PORT), SIPRegisterHandler)
+        serv = socketserver.UDPServer(('', SERVER_PORT), SIPRegisterHandler)
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: python3 proxy_registar.py config.')
 
-    print('Server AvengersServer listening at port 5555...')
+    print('Server ' + SERVER_NAME + ' listening at port ' +  str(SERVER_PORT) + '...')
     try:
         serv.serve_forever()
     except KeyboardInterrupt:

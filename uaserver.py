@@ -109,7 +109,8 @@ if __name__ == "__main__":
         sys.exit('Usage: python uaserver.py config')
 
     """Create echo server and listening."""
-    serv = socketserver.UDPServer((SERVER, PORT), EchoHandler)
+    #AQUI NO SE QUIEN ESCUCHA O ENVIA, DUDAS PREGUNTAR
+    serv = socketserver.UDPServer((IP, PORT), EchoHandler)
     print('Listening...')
     try:
         serv.serve_forever()
