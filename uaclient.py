@@ -6,6 +6,7 @@ import socket
 import sys
 import os
 import socketserver
+import hashlib
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from proxy_registar import XMLHandler
@@ -52,6 +53,8 @@ if __name__ == '__main__':
     FICH_LOG = cHandler.config['log_path']
     MEDIA = cHandler.config['audio_path']
 
+    #Sending first messages
+
     if METHOD == 'REGISTER':
         Request = 'REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n\r\n'
         header.append('Expires: ' + OPTION + '\r\n\r\n')
@@ -78,10 +81,14 @@ if __name__ == '__main__':
         response = data.decode('utf-8')
         print(response)
         if response.split()[1] == '401':   #probar lo de las respuestas estas de gregorio
+            nonce = response[6].split("=")[1]
+            h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
+            h.update(bytes(nonce,'utf-8'))
+            digest = h.hexdigest()
             header = []
             Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT + ' SIP/2.0\r\n\r\n'
             header.append('Expires: ' + OPTION + '\r\n\r\n')
-            header.append('Authorization: Digest response="' + PSW + '"\r\n\r\n')
+            header.append('Authorization: Digest response="' + digest + '"\r\n\r\n')
             send_mess(Request, header)
         if response.split()[1] == '200':
             header = [] #ESTO BORRA LA LISTA?

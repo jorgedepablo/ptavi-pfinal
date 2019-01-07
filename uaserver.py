@@ -21,6 +21,9 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 class EchoHandler(socketserver.DatagramRequestHandler):
 
+    def __init__(self):
+        self.correct = True
+    #ESTA PARTE REPASASR CUANDO ACABE PRINCIPAR
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
         valid_characters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
@@ -66,12 +69,12 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                     self.wfile.write(RING)
                     self.wfile.write(OK)
                     #este sdp es diferente?? con otro organizador y todo? no se deberia unir a esa sesion??
-                    SDP = ('Content-Type: application/sdp\r\n\r\n' +
-                           'v=0\r\n' + 'o=' + LOGIN + ' ' + SERVER_IP +
-                           '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
-                           'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
-                   self.wfile.write(b'SDP') #bytes 'utf-8' ES LO MISMO??
-                   print(TRYNING + RING + OK + SDP)
+                    SDP = ('Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
+                           'o=' + LOGIN + ' ' + SERVER_IP + '\r\n' +
+                           's=avengers_assemmble\r\n' + 't=0\r\n' + 'm=audio ' +
+                           str(RTP_PORT) + ' RTP\r\n\r\n')
+                    self.wfile.write(b'SDP')
+                    print(TRYNING + RING + OK + SDP)
         elif received_mess[0] == 'BYE':
             self.wfile.write(OK)
             print(OK)

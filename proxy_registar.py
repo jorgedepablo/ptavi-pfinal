@@ -5,6 +5,8 @@
 import socketserver
 import sys
 import time
+import random
+import hashlib
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 
@@ -45,16 +47,17 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         self.dict_Users = {}
         self.dict_Passwd = {}
 
-    def add_user(self, sip_address, expires_time):
+    def add_user(self, sip_address, expires_time, port):
         """Add users to the dictionary."""
         #HACER LO DEL NONCE
-        self.dict_Users[sip_address] = self.client_address[0] + ' Expires: '\
-                                                              + expires_time
+        self.dict_Users[sip_address] = self.client_address[0] + str(port) + time.time() + expires_time
+        register2json()
         self.wfile.write(OK)
 
     def del_user(self, sip_address):
         """Delete users of the dictionary."""
         del self.dict_Users[sip_address]
+        register2json()
         self.wfile.write(OK)
         #Aqui si hay un key error mandaria un not found???
 
@@ -89,6 +92,15 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 passwd = line.split()[1]
                 self.dict_Passwd[user] = passwd
 
+    def get_digest(self, user, nonce):
+        digest = 0
+        if user in self.dict_Passwd:
+            passwd = self.dict_Passwd[user]
+            h = hashlib.sha1(bytes(passwd + '\n', 'utf-8'))
+            h.update(bytes(nonce,'utf-8'))
+            digest = h.hexdigest()
+        return digest
+
     def re_send(self, user):
         #Si usuario esta en la lista sacar ip y puerto else not found
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
@@ -107,20 +119,18 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
     def handle(self):
         """Handle method of the server class."""
         self.json2register()
+        self.json2passwd()
         self.check_expires()
         received_mess = []
-        self.authorization = False
         for line in self.rfile:
             received_mess = line.decode('utf-8')
         received_mess = ''.join(received_mess).split()
         print(received_mess)
             #Aqui pondria lo del check_request
         if received_mess[0] == 'REGISTER':
+            nonce = random.randint(10**19, 10**20) #PreGUNTAR RANGO DEL NONCE PUEDE IR DESDE 0?
             clt_sip = received_mess[1].split(':')[1].split(':')[0]
             clt_port = int(received_mess[1].split(':')[1].split(':')[1])
-            print(clt_sip)
-            print(clt_port)
-            print(received_mess)
             if len(received_mess) == 5:
                 if received_mess[3] == 'Expires:':
                     expires_time = float(received_mess[4])
@@ -129,9 +139,11 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                         expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                                  time.gmtime(expires_time))
                         if clt_sip in self.dict_Users:
-                            self.add_user(clt_sip, expires_time)
+                            self.add_user(clt_sip, expires_time, clt_port)
                         else:
                             self.wfile.write(UNAUTHORIZED)
+                            self.wfile.write('WWW Authenticate: Digest nonce="' +
+                                             nonce + '"')
                     elif expires_time == 0:
                         self.del_user(clt_sip)
                 else:
@@ -140,9 +152,12 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 if received_mess[6] == 'Authorization:':
                     if received_mess[7] == 'Digest':
                         if received_mess[8].split('=')[0] == 'response':
-                            nonce = received_mess[8].split('=')[1]
-                            #Hacer que si pasa el nonce le añada
-                            self.add_user(clt_sip, expires_time)
+                            clt_digest = received_mess[8].split('"')[1].split('"')[0]
+                            digest = get_digest(clt_sip, nonce)
+                            if clt_digest == digest:
+                                self.add_user(clt_sip, expires_time, clt_port)
+                            else:
+                                self.wfile.write(UNAUTHORIZED)
                         else:
                             self.wfile.write(BAD_REQUEST)
                     else:
