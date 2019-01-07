@@ -20,9 +20,6 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
 class EchoHandler(socketserver.DatagramRequestHandler):
-    """Echo server class."""
-    def __init__(self):
-        self.correct = True
 
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
@@ -50,43 +47,41 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         for character in user.split(':')[1]:
             if character not in valid_characters:
                 self.correct = False
-
         return self.correct
+
 
     def handle(self):
         """Handle method of the server class."""
         received_mess = []
-        for index, line in enumerate(self.rfile):
+        for line in self.rfile:
             received_mess = line.decode('utf-8')
-            if index == 0:
-                # Reading the first string that client send
-                client = received_mess.split(':')[1].split('@')[0]
-                print(client + ' send: ' + received_mess)
-                if self.check_request(received_mess):
-                    method = received_mess.split()[0]
-                    if method == 'INVITE':
-                        self.wfile.write(TRYNING)
-                        self.wfile.write(RING)
-                        self.wfile.write(OK)
-                        print('Sending 100 Trying')
-                        print('Sending 180 Ring')
-                        print('Sending 200 OK')
-                    elif method == 'BYE':
-                        self.wfile.write(OK)
-                        print('Sending 200 OK')
-                    elif method == 'ACK':
-                        ToRun = 'mp32rtp -i 127.0.0.1 -p 23032 < ' + FICH
-                        print('Running: ', ToRun)
-                        os.system(ToRun)
-                    else:
-                        self.wfile.write(NOT_ALLOWED)
-                        print('Sending 405 Method Not Allowed')
-                else:
-                    self.wfile.write(BAD_REQUEST)
-                    print('Sending 400 Bad Request')
-            else:
-                # If no more lines, exit of the loop.
-                break
+        received_mess = ''.join(received_mess).split()
+        if received_mess[0] == 'INVITE':
+            if received_mess[7].startswith('o='):
+                organizer = received_mess[7].split('=')[1]
+                organizer_ip = received_mess[8]
+                if received_mess[11] == 'm=audio':
+                    organizer_port = int(received_mess[12])
+                    self.wfile.write(TRYNING)
+                    self.wfile.write(RING)
+                    self.wfile.write(OK)
+                    #este sdp es diferente?? con otro organizador y todo? no se deberia unir a esa sesion??
+                    SDP = ('Content-Type: application/sdp\r\n\r\n' +
+                           'v=0\r\n' + 'o=' + LOGIN + ' ' + SERVER_IP +
+                           '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
+                           'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
+                   self.wfile.write(b'SDP') #bytes 'utf-8' ES LO MISMO??
+                   print(TRYNING + RING + OK + SDP)
+        elif received_mess[0] == 'BYE':
+            self.wfile.write(OK)
+            print(OK)
+        elif received_mess[0] == 'ACK':
+            ToRun = 'mp32rtp -i ' + organizer_ip + ' -p' + organizer_port + ' < ' + MEDIA
+            print('Running: ', ToRun)
+            os.system(ToRun)
+        else:
+            self.wfile.write(NOT_ALLOWED)
+            print(NOT_ALLOWED)
 
 
 if __name__ == "__main__":
@@ -110,7 +105,7 @@ if __name__ == "__main__":
 
     """Create echo server and listening."""
     #AQUI NO SE QUIEN ESCUCHA O ENVIA, DUDAS PREGUNTAR
-    serv = socketserver.UDPServer((IP, PORT), EchoHandler)
+    serv = socketserver.UDPServer((PROXY_IP, PROXY_PORT), EchoHandler)
     print('Listening...')
     try:
         serv.serve_forever()

@@ -38,14 +38,14 @@ class XMLHandler(ContentHandler):
         return self.config
 
 
-class SIPRegisterHandler(socketserver.DatagramRequestHandler):
+class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
     """Echo register server class."""
 
     def __init__(self):
         self.dict_Users = {}
-        self.authorization = False
+        self.dict_Passwd = {}
 
-    def add_user(self, sip_address, expires_time, nonce):
+    def add_user(self, sip_address, expires_time):
         """Add users to the dictionary."""
         #HACER LO DEL NONCE
         self.dict_Users[sip_address] = self.client_address[0] + ' Expires: '\
@@ -56,6 +56,7 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
         """Delete users of the dictionary."""
         del self.dict_Users[sip_address]
         self.wfile.write(OK)
+        #Aqui si hay un key error mandaria un not found???
 
     def check_expires(self):
         """Check if the users have expired, delete them of the dictionary."""
@@ -67,49 +68,95 @@ class SIPRegisterHandler(socketserver.DatagramRequestHandler):
             if expires_time < current_time:
                 del self.dict_Users[user]
 
+    def register2json(self):
+        """Dump the data of users in a json file."""
+        self.check_expires()
+        with open(DATA_USERS, 'w') as json_file:
+            json.dump(self.dict_Users, json_file, indent=4)
+
+    def json2register(self):
+        """if exist a json file copy the data of users in the dictionary."""
+        try:
+            with open(DATA_USERS, 'r') as json_file:
+                self.dict_Users = json.load(json_file)
+        except FileNotFoundError:
+            pass
+
+    def json2passwd(self):
+        with open(DATA_PASSWD, 'r') as json_file:
+            for line in json_file:
+                user = line.split()[0]
+                passwd = line.split()[1]
+                self.dict_Passwd[user] = passwd
+
+    def re_send(self, user):
+        #Si usuario esta en la lista sacar ip y puerto else not found
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
+            my_socket.connect(ip, port)
+            for line in self.rfile:
+                print('Sending: ' + line)
+                my_socket.send(bytes(line, 'utf-8'))
+
+            data = my_socket.recv(1024)
+            response = data.decode('utf8')
+            print(response)
+            #EL 100, EL 180 Y EL 200 VAN JUNTOS???
+            if response.split()[1] == ('100', '180', '200'):
+                self.wfile.write(data)
+
     def handle(self):
         """Handle method of the server class."""
+        self.json2register()
         self.check_expires()
         received_mess = []
         self.authorization = False
-        for index, line in enumerate(self.rfile):
+        for line in self.rfile:
             received_mess = line.decode('utf-8')
-            received_mess = ''.join(received_mess).split()
-            if index == 0:
-                if received_mess[0] == 'REGISTER':
-                    sip_address = received_mess[1].split(':')[1].split(':')[0]
-                    port = received_mess[1].split(':')[1].split(':')[1]
-                else:
-                    self.wfile.write(BAD_REQUEST)
-            elif index == 1:
-                if received_mess[0] == 'Expires:':
-                    expires_time = float(received_mess[1])
+        received_mess = ''.join(received_mess).split()
+        print(received_mess)
+            #Aqui pondria lo del check_request
+        if received_mess[0] == 'REGISTER':
+            clt_sip = received_mess[1].split(':')[1].split(':')[0]
+            clt_port = int(received_mess[1].split(':')[1].split(':')[1])
+            print(clt_sip)
+            print(clt_port)
+            print(received_mess)
+            if len(received_mess) == 5:
+                if received_mess[3] == 'Expires:':
+                    expires_time = float(received_mess[4])
                     if expires_time > 0:
                         expires_time = expires_time + time.time()
                         expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                     time.gmtime(expires_time))
+                                                 time.gmtime(expires_time))
+                        if clt_sip in self.dict_Users:
+                            self.add_user(clt_sip, expires_time)
+                        else:
+                            self.wfile.write(UNAUTHORIZED)
                     elif expires_time == 0:
-                        self.del_user(sip_address)
+                        self.del_user(clt_sip)
                 else:
                     self.wfile.write(BAD_REQUEST)
-            elif index == 2:
-                if received_mess[0] == 'Authorization:':
-                    if received_mess[1] == 'Digest':
-                        if received_mess[2].split('=')[0] == 'response':
-                            nonce = received_mess[2].split('=')[1]
-                            #HACER QUE PASE LA CONTRASEÑA
-                            authorization = True
+            elif len(received_mess) == 8:
+                if received_mess[6] == 'Authorization:':
+                    if received_mess[7] == 'Digest':
+                        if received_mess[8].split('=')[0] == 'response':
+                            nonce = received_mess[8].split('=')[1]
+                            #Hacer que si pasa el nonce le añada
+                            self.add_user(clt_sip, expires_time)
                         else:
                             self.wfile.write(BAD_REQUEST)
                     else:
                         self.wfile.write(BAD_REQUEST)
-                else:
-                    self.wfile.write(BAD_REQUEST)
+            else:
+                self.wfile.write(BAD_REQUEST)
 
-        if not self.authorization:
-            self.wfile.write(UNAUTHORIZED)
+        elif received_mess[0] == 'INVITE' or 'BYE' or 'ACK':
+            user_address = received_mess[1].split(':')[1]
+            re_send(user_address)
+            #Se podra hacer un disconect? o se apaga solo el client?
+            #Chequear si conozco al que envia los mensajes para reenviarlos ?? si es asi como???
         else:
-            self.add_user(sip_address, expires_time, nonce)
+            self.wfile.write(NOT_ALLOWED)
 
 
 if __name__ == "__main__":
@@ -127,12 +174,12 @@ if __name__ == "__main__":
         DATA_USERS = cHandler.config['database_path']
         DATA_PASSWD = cHandler.config['database_passwdpath']
         FICH_LOG = cHandler.config['log_path']
-        serv = socketserver.UDPServer(('', SERVER_PORT), SIPRegisterHandler)
+        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), SIPRegisterProxyHandler)
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: python3 proxy_registar.py config.')
 
-    print('Server ' + SERVER_NAME + ' listening at port ' +  str(SERVER_PORT) + '...')
     try:
+        print('Server ' + SERVER_NAME + ' listening at port ' +  str(SERVER_PORT) + '...')
         serv.serve_forever()
     except KeyboardInterrupt:
         print('  Server interrupt')
