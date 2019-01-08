@@ -12,16 +12,14 @@ from xml.sax.handler import ContentHandler
 from proxy_registar import XMLHandler
 
 # UA Client UDP simple.
-header = []
-PSW = 'hacer aqui lo del response con el nonce'
+Request = []
 
 # procedure to send messages
-def send_mess(Request, header):
-    print('Sending: ' + Request)
+def send_mess(Request):
+    Request = ''.join(Request)
+    print('Sending: ')
+    print(Request)
     my_socket.send(bytes(Request, 'utf-8'))
-    for item in range(len(header)):
-        print('Sending: ' + header[item])
-        my_socket.send(bytes(header[item], 'utf-8'))
 
 def send_rtp(server_ip, server_port):
     ToRun = 'mp32rtp -i ' + server_ip + ' -p' + server_port + ' < ' + MEDIA
@@ -56,18 +54,18 @@ if __name__ == '__main__':
     #Sending first messages
 
     if METHOD == 'REGISTER':
-        Request = 'REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n\r\n'
-        header.append('Expires: ' + OPTION + '\r\n\r\n')
+        Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n')
+        Request.append('Expires: ' + OPTION + '\r\n')
     elif METHOD == 'INVITE':
-        Request = 'INVITE sip:' + OPTION + ' SIP/2.0\r\n\r\n'
-        header.append('Content-Type: application/sdp\r\n\r\n')
-        header.append('v=0\r\n')
-        header.append('o=' + LOGIN + ' ' + MY_IP + '\r\n')
-        header.append('s=avengers_assemmble\r\n')
-        header.append('t=0\r\n')
-        header.append('m=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
+        Request.append('INVITE sip:' + OPTION + ' SIP/2.0\r\n')
+        Request.append('Content-Type: application/sdp\r\n\r\n')
+        Request.append('v=0\r\n')
+        Request.append('o=' + LOGIN + ' ' + MY_IP + '\r\n')
+        Request.append('s=avengers_assemmble\r\n')
+        Request.append('t=0\r\n')
+        Request.append('m=audio ' + str(RTP_PORT) + ' RTP\r\n')
     elif METHOD == 'BYE':
-        Request = 'BYE sip:' + OPTION + ' SIP/2.0\r\n\r\n'
+        Request.append('BYE sip:' + OPTION + ' SIP/2.0\r\n')
     else:
         exit('Usage: method not avaleible')
 
@@ -75,25 +73,21 @@ if __name__ == '__main__':
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((PROXY_IP, PROXY_PORT))
-        send_mess(Request, header)
+        send_mess(Request)
 
         data = my_socket.recv(1024)
         response = data.decode('utf-8')
         print(response)
         if response.split()[1] == '401':   #probar lo de las respuestas estas de gregorio
-            nonce = response[6].split("=")[1]
+            nonce = response.split('"')[1]
             h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
             h.update(bytes(nonce,'utf-8'))
             digest = h.hexdigest()
-            header = []
-            Request = 'REGISTER sip:' + LOGIN + ':' + MY_PORT + ' SIP/2.0\r\n\r\n'
-            header.append('Expires: ' + OPTION + '\r\n\r\n')
-            header.append('Authorization: Digest response="' + digest + '"\r\n\r\n')
-            send_mess(Request, header)
-        if response.split()[1] == '200':
-            header = [] #ESTO BORRA LA LISTA?
-            Request = 'ACK sip:' + OPTION + ' SIP/2.0\r\n\r\n'
-            send_mess(Request, header)
+            Request = []
+            Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n')
+            Request.append('Expires: ' + OPTION + '\r\n')
+            Request.append('Authorization: Digest response="' + digest + '"\r\n')
+            send_mess(Request)
         if response.split()[1] == '100':
             if response.split()[4] == '180':
                 if response.split()[7] == '200':

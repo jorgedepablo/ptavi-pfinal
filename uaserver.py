@@ -21,8 +21,7 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 class EchoHandler(socketserver.DatagramRequestHandler):
 
-    def __init__(self):
-        self.correct = True
+    correct = True
     #ESTA PARTE REPASASR CUANDO ACABE PRINCIPAR
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
@@ -57,7 +56,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         """Handle method of the server class."""
         received_mess = []
         for line in self.rfile:
-            received_mess = line.decode('utf-8')
+            received_mess.append(line.decode('utf-8'))
         received_mess = ''.join(received_mess).split()
         if received_mess[0] == 'INVITE':
             if received_mess[7].startswith('o='):
@@ -108,7 +107,7 @@ if __name__ == "__main__":
 
     """Create echo server and listening."""
     #AQUI NO SE QUIEN ESCUCHA O ENVIA, DUDAS PREGUNTAR
-    serv = socketserver.UDPServer((PROXY_IP, PROXY_PORT), EchoHandler)
+    serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
     print('Listening...')
     try:
         serv.serve_forever()
