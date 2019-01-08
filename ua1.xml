@@ -5,5 +5,4 @@
     <regproxy ip="localhost" port="5555"/>
     <log path="ua1.log"/>
     <audio path="cancion.mp3"/>
-    hola
 </config>
