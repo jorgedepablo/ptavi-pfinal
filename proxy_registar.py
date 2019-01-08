@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-"""Class (and main program) for echo register server in UDP simple."""
+#Nick Fury Server
+"""Class (and main program) for proxy register server in UDP simple."""
 
 import socketserver
 import socket
@@ -21,14 +22,14 @@ NOT_FOUND = b'SIP/2.0 404 User Not Found\r\n\r\n'
 NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
-class WriteLog():
+"""-class WriteLog(Event):
     def __init__(self):
         from __main__ import FICH_LOG as log
         self.log = log
 
     def start_log(self):
          current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time()))
-         action = (current_time + 'Starting...')
+         action = (current_time + 'Starting...')"""
 
 
 class XMLHandler(ContentHandler):
@@ -49,7 +50,7 @@ class XMLHandler(ContentHandler):
             for tag in self.attrsDict[name]:
                 self.config[name + '_' + tag] = attrs.get(tag, '')
 
-    def get_config(self):
+    def get_tags(self):
         return self.config
 
 
@@ -92,7 +93,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
             json.dump(self.dict_Users, json_file, indent=4)
 
     def json2register(self):
-        """if exist a json file copy the data of users in the dictionary."""
+        """If exist a json file copy the data of users in the dictionary."""
         try:
             with open(DATA_USERS, 'r') as json_file:
                 self.dict_Users = json.load(json_file)
@@ -100,6 +101,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
             pass
 
     def json2passwd(self):
+        """Copy the data of passwords in the dictionary"""
         with open(DATA_PASSWD, 'r') as json_file:
             self.dict_Passwd = json.load(json_file)
 
@@ -114,22 +116,19 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         return digest
 
     def re_send(self, user, mess):
-        #Si usuario esta en la lista sacar ip y puerto else not found
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
             my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             ip = self.dict_Users[user][0]
             port =  self.dict_Users[user][1]
             my_socket.connect((ip, int(port)))
-            print('Sending: ')
-            print(mess)
             my_socket.send(bytes(mess, 'utf-8'))
 
-            data = my_socket.recv(1024)
-            response = data.decode('utf8')
-            print(response)
-            #EL 100, EL 180 Y EL 200 VAN JUNTOS???
-            if response.split()[1] == ('100', '180', '200'):
+            if  not ''.join(mess).split()[0] == 'ACK':
+                data = my_socket.recv(1024)
+                response = data.decode('utf8')
+                received_mess = ''.join(response).split()
                 self.wfile.write(data)
+
 
     def handle(self):
         """Handle method of the server class."""
@@ -139,9 +138,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         received_mess = []
         for line in self.rfile:
             received_mess.append(line.decode('utf-8'))
-
         received_mess = ''.join(received_mess)
-        print(received_mess)
             #Aqui pondria lo del check_request
         if received_mess.split()[0] == 'REGISTER':
             clt_sip = received_mess.split()[1].split(':')[1]
@@ -171,11 +168,11 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 if received_mess.split()[5] == 'Authorization:':
                     if received_mess.split()[6] == 'Digest':
                         if received_mess.split()[7].split('=')[0] == 'response':
-                            expires_time = float(received_mess[4])
+                            expires_time = float(received_mess.split()[4])
                             expires_time = expires_time + time.time()
                             expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                                      time.gmtime(expires_time))
-                            clt_digest = received_mess[7].split('"')[1]
+                            clt_digest = received_mess.split()[7].split('"')[1]
                             digest = self.get_digest(clt_sip)
                             if clt_digest == digest:
                                 self.add_user(clt_sip, expires_time, clt_port)
@@ -192,8 +189,10 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
 
         elif received_mess.split()[0] == 'INVITE' or 'BYE' or 'ACK':
             user_address = received_mess.split()[1].split(':')[1]
-            self.re_send(user_address, received_mess)
-            #Se podra hacer un disconect? o se apaga solo el client?
+            if user_address in self.dict_Users:
+                self.re_send(user_address, received_mess)
+            else:
+                self.wfile.write(NOT_FOUND)
             #Chequear si conozco al que envia los mensajes para reenviarlos ?? si es asi como???
         else:
             self.wfile.write(NOT_ALLOWED)

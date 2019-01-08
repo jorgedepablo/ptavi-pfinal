@@ -22,6 +22,7 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 class EchoHandler(socketserver.DatagramRequestHandler):
 
     correct = True
+    dict_RTP = {}
     #ESTA PARTE REPASASR CUANDO ACABE PRINCIPAR
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
@@ -59,31 +60,32 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             received_mess.append(line.decode('utf-8'))
         received_mess = ''.join(received_mess).split()
         if received_mess[0] == 'INVITE':
-            if received_mess[7].startswith('o='):
-                organizer = received_mess[7].split('=')[1]
-                organizer_ip = received_mess[8]
-                if received_mess[11] == 'm=audio':
-                    organizer_port = int(received_mess[12])
+            if received_mess[6].startswith('o='):
+                organizer_ip = received_mess[7]
+                if received_mess[10] == 'm=audio':
+                    organizer_port = received_mess[11]
+                    self.dict_RTP['1'] = (organizer_ip, organizer_port)
                     self.wfile.write(TRYNING)
                     self.wfile.write(RING)
                     self.wfile.write(OK)
-                    #este sdp es diferente?? con otro organizador y todo? no se deberia unir a esa sesion??
                     SDP = ('Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
                            'o=' + LOGIN + ' ' + SERVER_IP + '\r\n' +
                            's=avengers_assemmble\r\n' + 't=0\r\n' + 'm=audio ' +
                            str(RTP_PORT) + ' RTP\r\n\r\n')
-                    self.wfile.write(b'SDP')
-                    print(TRYNING + RING + OK + SDP)
+                    self.wfile.write(bytes(SDP, 'utf-8'))
+            else:
+                self.wfile.write(BAD_REQUEST)
         elif received_mess[0] == 'BYE':
             self.wfile.write(OK)
-            print(OK)
         elif received_mess[0] == 'ACK':
-            ToRun = 'mp32rtp -i ' + organizer_ip + ' -p' + organizer_port + ' < ' + MEDIA
+            organizer_ip = self.dict_RTP['1'][0]
+            organizer_port = self.dict_RTP['1'][1]
+            ToRun = ('mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port +
+                     ' < ' + MEDIA)
             print('Running: ', ToRun)
             os.system(ToRun)
         else:
             self.wfile.write(NOT_ALLOWED)
-            print(NOT_ALLOWED)
 
 
 if __name__ == "__main__":
@@ -106,7 +108,6 @@ if __name__ == "__main__":
         sys.exit('Usage: python uaserver.py config')
 
     """Create echo server and listening."""
-    #AQUI NO SE QUIEN ESCUCHA O ENVIA, DUDAS PREGUNTAR
     serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
     print('Listening...')
     try:

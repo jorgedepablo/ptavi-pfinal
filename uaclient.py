@@ -14,15 +14,13 @@ from proxy_registar import XMLHandler
 # UA Client UDP simple.
 Request = []
 
-# procedure to send messages
+# Procedure to send messages
 def send_mess(Request):
     Request = ''.join(Request)
-    print('Sending: ')
-    print(Request)
     my_socket.send(bytes(Request, 'utf-8'))
 
 def send_rtp(server_ip, server_port):
-    ToRun = 'mp32rtp -i ' + server_ip + ' -p' + server_port + ' < ' + MEDIA
+    ToRun = 'mp32rtp -i ' + server_ip + ' -p ' + server_port + ' < ' + MEDIA
     print('Running: ', ToRun)
     os.system(ToRun)
 
@@ -51,10 +49,10 @@ if __name__ == '__main__':
     FICH_LOG = cHandler.config['log_path']
     MEDIA = cHandler.config['audio_path']
 
-    #Sending first messages
-
+    #Forming first request
     if METHOD == 'REGISTER':
-        Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n')
+        Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) +
+                       ' SIP/2.0\r\n')
         Request.append('Expires: ' + OPTION + '\r\n')
     elif METHOD == 'INVITE':
         Request.append('INVITE sip:' + OPTION + ' SIP/2.0\r\n')
@@ -74,29 +72,35 @@ if __name__ == '__main__':
         my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         my_socket.connect((PROXY_IP, PROXY_PORT))
         send_mess(Request)
-
+        # Reciving response, and asking with a new response (if applicable)
         data = my_socket.recv(1024)
         response = data.decode('utf-8')
-        print(response)
-        if response.split()[1] == '401':   #probar lo de las respuestas estas de gregorio
+        if response.split()[1] == '401':
             nonce = response.split('"')[1]
             h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
             h.update(bytes(nonce,'utf-8'))
             digest = h.hexdigest()
             Request = []
-            Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) + ' SIP/2.0\r\n')
+            Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) +
+                           ' SIP/2.0\r\n')
             Request.append('Expires: ' + OPTION + '\r\n')
-            Request.append('Authorization: Digest response="' + digest + '"\r\n')
+            Request.append('Authorization: Digest response="' + digest +
+                           '"\r\n')
             send_mess(Request)
-        if response.split()[1] == '100':
+        elif response.split()[1] == '100':
             if response.split()[4] == '180':
                 if response.split()[7] == '200':
-                    #NO SE COMO VA EXACTAMENTE LO DEL SDP DE RESPUESTA
+                    Request = []
+                    Request.append('ACK sip:' + OPTION + ' SIP/2.0\r\n')
+                    send_mess(Request)
                     server_name = response.split()[12].split('=')[1]
                     server_ip = response.split()[13]
                     server_port = response.split()[17]
                     send_rtp(server_ip, server_port)
-
+        elif response.split()[1] == '200':
+            #Aqui poner un Log o arriba que coja todo
+            print('gozando como un hijoputa')
+ #REVISAR ESTOS PRINTSS!!
         print('Ending socket...')
 
     print('Socket done.')
