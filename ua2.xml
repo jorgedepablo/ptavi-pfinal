@@ -1,5 +1,5 @@
 <config>
-    <account username="thor@avengers.com" passwd="G0dof7hund3r"/>
+    <account username="captain_america@avengers.com" passwd="St3veR0gers"/>
     <uaserver ip="localhost" port="9002"/>
     <rtpaudio port="5487"/>
     <regproxy ip="localhost" port="5555"/>
