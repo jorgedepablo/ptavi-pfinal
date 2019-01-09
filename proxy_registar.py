@@ -22,18 +22,60 @@ NOT_FOUND = b'SIP/2.0 404 User Not Found\r\n\r\n'
 NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
-"""-class WriteLog(Event):
+class WriterLog():
+    """Class for write log file"""
     def __init__(self):
         from __main__ import FICH_LOG as log
         self.log = log
 
-    def start_log(self):
-         current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time()))
-         action = (current_time + 'Starting...')"""
+    def wrt_log(self, status):
+         with open(self.log, 'a') as log_file:
+             log_file.write(status)
+
+    def starting(self):
+         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                      time.gmtime(time.time()))
+         status = (current_time + ' Starting...\r\n')
+         self.wrt_log(status)
+
+    def finishing(self):
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        status = (current_time + ' Finishing.\r\n')
+        self.wrt_log(status)
+
+    def senting(self, ip, port, content):
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        content = content.replace('\r\n', ' ')
+        status = (current_time + ' Sent to ' + ip + ':' + str(port) +
+                  ': ' + content + '\r\n')
+        self.wrt_log(status)
+
+    def received(self, ip, port, content):
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        content = content.replace('\r\n', ' ')
+        status = (current_time + ' Received from ' + ip + ':' + str(port) +
+                  ': ' + content + '\r\n')
+        self.wrt_log(status)
+
+    def senting_rtp(self, ip, port, media):
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        status = (current_time + ' Senting to ' + ip + ':' + str(port) +
+                  ' file: ' + media + ' by RTP\r\n')
+
+    def conexion_refused(self, ip, pot):
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        status = ('Error: No server listening at ' + ip + ' port ' +
+                  str(port) + '\r\n')
+        self.wrt_log(status)
 
 
 class XMLHandler(ContentHandler):
-
+    """Class for pick config of XML"""
     def __init__(self):
         self.attrsDict = {'account': ['username', 'passwd'],
                           'uaserver': ['ip', 'port'],
@@ -63,17 +105,20 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
 
     def add_user(self, sip_address, expires_time, port):
         """Add users to the dictionary."""
-        #HACER LO DEL NONCE
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time()))
-        self.dict_Users[sip_address] = (self.client_address[0], str(port), current_time, expires_time)
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        self.dict_Users[sip_address] = (self.client_address[0], str(port),
+                                        current_time, expires_time)
         self.register2json()
         self.wfile.write(OK)
+        log.senting(self.client_address[0], self.client_address[1], OK.decode())
 
     def del_user(self, sip_address):
         """Delete users of the dictionary."""
         del self.dict_Users[sip_address]
         self.register2json()
         self.wfile.write(OK)
+        log.senting(self.client_address[0], self.client_address[1], OK.decode())
         #Aqui si hay un key error mandaria un not found???
 
     def check_expires(self):
@@ -106,6 +151,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
             self.dict_Passwd = json.load(json_file)
 
     def get_digest(self, user):
+        """Get the digest with the passwords of dictionary"""
         digest = 0
         nonce = str(self.dict_Nonce[user])
         if user in self.dict_Passwd:
@@ -116,18 +162,22 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         return digest
 
     def re_send(self, user, mess):
+        """Proxy function"""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
             my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             ip = self.dict_Users[user][0]
             port =  self.dict_Users[user][1]
-            my_socket.connect((ip, int(port)))
-            my_socket.send(bytes(mess, 'utf-8'))
-
-            if  not ''.join(mess).split()[0] == 'ACK':
-                data = my_socket.recv(1024)
-                response = data.decode('utf8')
-                received_mess = ''.join(response).split()
-                self.wfile.write(data)
+            try:
+                my_socket.connect((ip, int(port)))
+                my_socket.send(bytes(mess, 'utf-8'))
+                log.senting(ip, port, mess)
+                if  not ''.join(mess).split()[0] == 'ACK':
+                    data = my_socket.recv(1024)
+                    response = data.decode('utf8')
+                    log.received(ip, port, response)
+                    self.wfile.write(data)
+            except ConnectionRefusedError:
+                log.conexion_refused(ip, port)
 
 
     def handle(self):
@@ -139,13 +189,19 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         for line in self.rfile:
             received_mess.append(line.decode('utf-8'))
         received_mess = ''.join(received_mess)
-            #Aqui pondria lo del check_request
+        log.received(self.client_address[0], self.client_address[1],
+                     received_mess)
         if received_mess.split()[0] == 'REGISTER':
-            clt_sip = received_mess.split()[1].split(':')[1]
-            clt_port = int(received_mess.split()[1].split(':')[2])
+            try:
+                clt_sip = received_mess.split()[1].split(':')[1]
+                clt_port = int(received_mess.split()[1].split(':')[2])
+                expires_time = float(received_mess.split()[4])
+            except:
+                self.wfile.write(BAD_REQUEST)
+                log.senting(self.client_address[0], self.client_address[1],
+                            decode(BAD_REQUEST))
             if len(received_mess.split()) == 5:
                 if received_mess.split()[3] == 'Expires:':
-                    expires_time = float(received_mess.split()[4])
                     if expires_time > 0:
                         expires_time = expires_time + time.time()
                         expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
@@ -158,17 +214,21 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                             else:
                                 nonce = random.randint(10**19, 10**20)
                                 self.dict_Nonce[clt_sip] = nonce
-                            self.wfile.write(UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' +
-                                             bytes(str(nonce), 'utf-8') + b'"\r\n\r\n')
+                                mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                            self.wfile.write(mess)
+                            log.senting(self.client_address[0],
+                                        self.client_address[1],
+                                        mess.decode())
                     elif expires_time == 0:
                         self.del_user(clt_sip)
                 else:
                     self.wfile.write(BAD_REQUEST)
+                    log.senting(self.client_address[0], self.client_address[1],
+                                BAD_REQUEST.decode())
             elif len(received_mess.split()) == 8:
                 if received_mess.split()[5] == 'Authorization:':
                     if received_mess.split()[6] == 'Digest':
                         if received_mess.split()[7].split('=')[0] == 'response':
-                            expires_time = float(received_mess.split()[4])
                             expires_time = expires_time + time.time()
                             expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                                      time.gmtime(expires_time))
@@ -178,14 +238,27 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                                 self.add_user(clt_sip, expires_time, clt_port)
                             else:
                                 self.wfile.write(UNAUTHORIZED)
+                                log.senting(self.client_address[0],
+                                            self.client_address[1],
+                                            UNAUTHORIZED.decode())
                         else:
                             self.wfile.write(BAD_REQUEST)
+                            log.senting(self.client_address[0],
+                                        self.client_address[1],
+                                        BAD_REQUEST.decode())
                     else:
                         self.wfile.write(BAD_REQUEST)
+                        log.senting(self.client_address[0],
+                                    self.client_address[1],
+                                    BAD_REQUEST.decode())
                 else:
                     self.wfile.write(BAD_REQUEST)
+                    log.senting(self.client_address[0], self.client_address[1],
+                                BAD_REQUEST.decode())
             else:
                 self.wfile.write(BAD_REQUEST)
+                log.senting(self.client_address[0], self.client_address[1],
+                            BAD_REQUEST.decode())
 
         elif received_mess.split()[0] == 'INVITE' or 'BYE' or 'ACK':
             user_address = received_mess.split()[1].split(':')[1]
@@ -193,17 +266,19 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 self.re_send(user_address, received_mess)
             else:
                 self.wfile.write(NOT_FOUND)
-            #Chequear si conozco al que envia los mensajes para reenviarlos ?? si es asi como???
+                log.senting(self.client_address[0], self.client_address[1],
+                            NOT_FOUND.decode())
         else:
             self.wfile.write(NOT_ALLOWED)
+            log.senting(self.client_address[0], self.client_address[1],
+                        NOT_ALLOWED.decode())
 
 
 if __name__ == "__main__":
-    # Listens at localhost ('') in a port defined by the user
-    # and calls the SIPRegisterHandler class to manage the request
     parser = make_parser()
     cHandler = XMLHandler()
     parser.setContentHandler(cHandler)
+    # Forming first request
     try:
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
@@ -213,12 +288,17 @@ if __name__ == "__main__":
         DATA_USERS = cHandler.config['database_path']
         DATA_PASSWD = cHandler.config['database_passwdpath']
         FICH_LOG = cHandler.config['log_path']
-        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), SIPRegisterProxyHandler)
+        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT),
+                                      SIPRegisterProxyHandler)
+        log = WriterLog()
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: python3 proxy_registar.py config.')
 
     try:
-        print('Server ' + SERVER_NAME + ' listening at port ' +  str(SERVER_PORT) + '...')
+        print('Server ' + SERVER_NAME + ' listening at port ' +
+              str(SERVER_PORT) + '...')
+        log.starting()
         serv.serve_forever()
     except KeyboardInterrupt:
+        log.finishing()
         print('  Server interrupt')

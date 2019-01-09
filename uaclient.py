@@ -9,15 +9,13 @@ import socketserver
 import hashlib
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
-from proxy_registar import XMLHandler
-
-# UA Client UDP simple.
-Request = []
+from proxy_registar import XMLHandler, WriterLog
 
 # Procedure to send messages
 def send_mess(Request):
     Request = ''.join(Request)
     my_socket.send(bytes(Request, 'utf-8'))
+    log.senting(PROXY_IP, PROXY_PORT, Request)
 
 def send_rtp(server_ip, server_port):
     ToRun = 'mp32rtp -i ' + server_ip + ' -p ' + server_port + ' < ' + MEDIA
@@ -29,13 +27,12 @@ if __name__ == '__main__':
     parser = make_parser()
     cHandler = XMLHandler()
     parser.setContentHandler(cHandler)
-    # Pick config, method and option of keyboard.
+    # Pick config of keyboard and fich.
     try:
         CONFIG = sys.argv[1]
         METHOD = sys.argv[2]
         OPTION = sys.argv[3]
         parser.parse(open(CONFIG))
-
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: uaclient.py config method option')
 
@@ -48,8 +45,10 @@ if __name__ == '__main__':
     PROXY_PORT = int(cHandler.config['regproxy_port'])
     FICH_LOG = cHandler.config['log_path']
     MEDIA = cHandler.config['audio_path']
-
-    #Forming first request
+    Request = []
+    log = WriterLog()
+    log.starting()
+    # Forming first request
     if METHOD == 'REGISTER':
         Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) +
                        ' SIP/2.0\r\n')
@@ -65,16 +64,25 @@ if __name__ == '__main__':
     elif METHOD == 'BYE':
         Request.append('BYE sip:' + OPTION + ' SIP/2.0\r\n')
     else:
+        log.finishing()
         exit('Usage: method not avaleible')
 
     # Create the socket, configure it and attach it to server/port
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
-        my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        my_socket.connect((PROXY_IP, PROXY_PORT))
-        send_mess(Request)
+        try:
+            my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,
+                                 1)
+            my_socket.connect((PROXY_IP, PROXY_PORT))
+            send_mess(Request)
+        except ConnectionRefusedError:
+            log.conexion_refused(PROXY_IP, PROXY_PORT)
+            log.finishing()
+            exit('Error: No server listening at ' + PROXY_IP +
+                 ' port ' + str(PROXY_PORT))
         # Reciving response, and asking with a new response (if applicable)
         data = my_socket.recv(1024)
         response = data.decode('utf-8')
+        log.received(PROXY_IP, PROXY_PORT, response)
         if response.split()[1] == '401':
             nonce = response.split('"')[1]
             h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
@@ -97,10 +105,6 @@ if __name__ == '__main__':
                     server_ip = response.split()[13]
                     server_port = response.split()[17]
                     send_rtp(server_ip, server_port)
-        elif response.split()[1] == '200':
-            #Aqui poner un Log o arriba que coja todo
-            print('gozando como un hijoputa')
- #REVISAR ESTOS PRINTSS!!
         print('Ending socket...')
-
+        log.finishing()
     print('Socket done.')

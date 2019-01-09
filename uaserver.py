@@ -7,15 +7,13 @@ import sys
 import os
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
-from proxy_registar import XMLHandler
+from proxy_registar import XMLHandler, WriterLog
 
 
 TRYNING = b'SIP/2.0 100 Trying\r\n\r\n'
 RING = b'SIP/2.0 180 Ring\r\n\r\n'
 OK = b'SIP/2.0 200 OK\r\n\r\n'
 BAD_REQUEST = b'SIP/2.0 400 Bad Request\r\n\r\n'
-UNAUTHORIZED = b'SIP/2.0 401 Unauthorized\r\n\r\n'
-NOT_FOUND = b'SIP/2.0 404 User Not Found\r\n\r\n'
 NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
@@ -32,60 +30,138 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                             'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
                             'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
                             'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7',
-                            '8', '9', '_', '-', '.']
-        try:
-            body = mess.split()[1]
-            version = mess.split()[2]
-            user = body.split('@')[0]
-            ip = body.split('@')[1]
-        except IndexError:
-            self.correct = False
+                            '8', '9', '_', '-', '.', '@']
 
-        if len(mess.split()) != 3:
-            self.correct = False
-        if version != 'SIP/2.0':
-            self.correct = False
-        if user.split(':')[0] != 'sip':
-            self.correct = False
-        for character in user.split(':')[1]:
-            if character not in valid_characters:
+        if mess.split()[0] == 'INVITE':
+            try:
+                user = mess.split()[1]
+                version = mess.split()[2]
+                content_type = mess.split()[3]
+                app = mess.split()[4]
+                version = mess.split()[5]
+                organizer = mess.split()[6]
+                sesion = mess.split()[8]
+                time_sesion = mess.split()[9]
+                mult = mess.split()[10]
+                int(mess.split()[11])
+                rtp = mess.split()[12]
+            except (IndexError, ValueError):
                 self.correct = False
-        return self.correct
 
+            if len(mess.split()) != 11:
+                self.correct = False
+            if not user.startswith('sip:'):
+                    self.correct = False
+            else:
+                at = 0
+                for character in user.split(':')[1]:
+                    if character not in valid_characters:
+                        self.correct = False
+                    if character == '@':
+                        at = at + 1
+                if at != 1:
+                    self.correct = False
+            if version != 'SIP/2.0':
+                self.correct = False
+            if content_type != 'Content-Type:':
+                self.correct = False
+            if app != 'application/sdp':
+                self.correct = False
+            if version != 'v=0':
+                self.correct = False
+            if not organizer.startswith('o='):
+                self.correct = False
+            else:
+                at = 0
+                for character in organizer.split('=')[1]:
+                    if character not in valid_characters:
+                        self.correct = False
+                    if character == '@':
+                        at = at + 1
+                if at != 1:
+                    self.correct = False
+            if not sesion.startswith('s='):
+                self.correct = False
+            else:
+                for character in sesion.split('=')[1]:
+                    if character not in valid_characters:
+                        self.correct = False
+            if mult != 'm=audio':
+                self.correct = False
+            if rtp != 'RTP':
+                self.correct = False
+        if  mess.split()[0] == ('ACK', 'BYE'):
+            try:
+                user = mess.split()[1]
+                version = mess.split()[2]
+            except IndexError:
+                self.correct = False
+
+            if len(mess.split()) != 3:
+                self.correct = False
+            if not user.startswith('sip:'):
+                    self.correct = False
+            else:
+                at = 0
+                for character in user.split(':')[1]:
+                    if character not in valid_characters:
+                        self.correct = False
+                    if character == '@':
+                        at = at + 1
+                if at != 1:
+                    self.correct = False
+            if version != 'SIP/2.0':
+                self.correct = False
 
     def handle(self):
         """Handle method of the server class."""
         received_mess = []
         for line in self.rfile:
             received_mess.append(line.decode('utf-8'))
-        received_mess = ''.join(received_mess).split()
-        if received_mess[0] == 'INVITE':
-            if received_mess[6].startswith('o='):
-                organizer_ip = received_mess[7]
-                if received_mess[10] == 'm=audio':
-                    organizer_port = received_mess[11]
+        received_mess = ''.join(received_mess)
+        log.received(self.client_address[0], self.client_address[1],
+                     received_mess)
+        if check_request(received_mess):
+            if received_mess.split()[0] == 'INVITE':
+                    organizer_ip = received_mess[7]
+                    organizer_port = received_mess.split()[11]
                     self.dict_RTP['1'] = (organizer_ip, organizer_port)
                     self.wfile.write(TRYNING)
+                    log.senting(self.client_address[0], self.client_address[1],
+                                TRYNING.decode())
                     self.wfile.write(RING)
+                    log.senting(self.client_address[0], self.client_address[1],
+                                RING.decode())
                     self.wfile.write(OK)
-                    SDP = ('Content-Type: application/sdp\r\n\r\n' + 'v=0\r\n' +
-                           'o=' + LOGIN + ' ' + SERVER_IP + '\r\n' +
-                           's=avengers_assemmble\r\n' + 't=0\r\n' + 'm=audio ' +
-                           str(RTP_PORT) + ' RTP\r\n\r\n')
+                    log.senting(self.client_address[0], self.client_address[1],
+                                OK.decode())
+                    SDP = ('Content-Type: application/sdp\r\n\r\n' +
+                           'v=0\r\n' + 'o=' + LOGIN + ' ' + SERVER_IP +
+                           '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
+                           'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
                     self.wfile.write(bytes(SDP, 'utf-8'))
+                    log.senting(self.client_address[0], self.client_address[1],
+                                SDP)
+            elif received_mess.split()[0] == 'BYE':
+                self.wfile.write(OK)
+                log.senting(self.client_address[0], self.client_address[1],
+                            OK.decode())
+            elif received_mess.split()[0] == 'ACK':
+                organizer_ip = self.dict_RTP['1'][0]
+                organizer_port = self.dict_RTP['1'][1]
+                ToRun = ('mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port +
+                         ' < ' + MEDIA)
+                print('Running: ', ToRun)
+                log.send_rtp(organizer_ip, organizer_port, MEDIA)
+                os.system(ToRun)
             else:
-                self.wfile.write(BAD_REQUEST)
-        elif received_mess[0] == 'BYE':
-            self.wfile.write(OK)
-        elif received_mess[0] == 'ACK':
-            organizer_ip = self.dict_RTP['1'][0]
-            organizer_port = self.dict_RTP['1'][1]
-            ToRun = ('mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port +
-                     ' < ' + MEDIA)
-            print('Running: ', ToRun)
-            os.system(ToRun)
+                self.wfile.write(NOT_ALLOWED)
+                log.senting(self.client_address[0], self.client_address[1],
+                            NOT_ALLOWED.decode())
         else:
-            self.wfile.write(NOT_ALLOWED)
+            self.wfile.write(BAD_REQUEST)
+            log.senting(self.client_address[0], self.client_address[1],
+                        BAD_REQUEST.decode())
 
 
 if __name__ == "__main__":
@@ -96,7 +172,6 @@ if __name__ == "__main__":
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
         LOGIN = cHandler.config['account_username']
-        PASSWD = cHandler.config['account_passwd']
         SERVER_IP = cHandler.config['uaserver_ip']
         SERVER_PORT = int(cHandler.config['uaserver_port'])
         RTP_PORT = int(cHandler.config['rtpaudio_port'])
@@ -104,13 +179,16 @@ if __name__ == "__main__":
         PROXY_PORT = int(cHandler.config['regproxy_port'])
         FICH_LOG = cHandler.config['log_path']
         MEDIA = cHandler.config['audio_path']
+        log = WriterLog()
     except (IndexError, ValueError):
         sys.exit('Usage: python uaserver.py config')
 
     """Create echo server and listening."""
+    log.starting()
     serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
     print('Listening...')
     try:
         serv.serve_forever()
     except KeyboardInterrupt:
+        log.finishing()
         print('  Server interrupt')
