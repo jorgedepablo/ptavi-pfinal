@@ -65,8 +65,9 @@ class WriterLog():
                                      time.gmtime(time.time()))
         status = (current_time + ' Senting to ' + ip + ':' + str(port) +
                   ' file: ' + media + ' by RTP\r\n')
+        self.wrt_log(status)
 
-    def conexion_refused(self, ip, pot):
+    def conexion_refused(self, ip, port):
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         status = ('Error: No server listening at ' + ip + ' port ' +
@@ -102,11 +103,11 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
     dict_Users = {}
     dict_Passwd = {}
     dict_Nonce = {}
+    correct = True
 
     def add_user(self, sip_address, expires_time, port):
         """Add users to the dictionary."""
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                     time.gmtime(time.time()))
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time()))
         self.dict_Users[sip_address] = (self.client_address[0], str(port),
                                         current_time, expires_time)
         self.register2json()
@@ -119,7 +120,6 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         self.register2json()
         self.wfile.write(OK)
         log.senting(self.client_address[0], self.client_address[1], OK.decode())
-        #Aqui si hay un key error mandaria un not found???
 
     def check_expires(self):
         """Check if the users have expired, delete them of the dictionary."""
@@ -161,6 +161,65 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
             digest = h.hexdigest()
         return digest
 
+    def check_request(self, mess):
+        """Check if the SIP request is correctly formed."""
+        valid_characters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
+                            'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+                            'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D',
+                            'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                            'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                            'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7',
+                            '8', '9', '_', '-', '.', '@']
+        try:
+            address = mess.split()[1]
+            version = mess.split()[2]
+            exp = mess.split()[3]
+            float(mess.split()[4])
+        except IndexError:
+            self.correct = False
+
+        if len(mess.split()) != 5 and len(mess.split()) != 8:
+            self.correct = False
+        if not address.startswith('sip:'):
+            self.correct = False
+        else:
+            at = 0
+            for character in address.split(':')[1]:
+                if character not in valid_characters:
+                    self.correct = False
+                if character == '@':
+                    at = at + 1
+            if at != 1:
+                self.correct = False
+        if version != 'SIP/2.0':
+            self.correct = False
+        if exp != 'Expires:':
+            self.correct = False
+
+        if len(mess.split()) == 8:
+            try:
+                athr = mess.split()[5]
+                dig = mess.split()[6]
+                rspnc = mess.split()[7]
+            except IndexError:
+                self.correct = False
+
+            if athr != 'Authorization:':
+                self.correct = False
+            if dig!= 'Digest':
+                self.correct = False
+            if not rspnc.startswith('response="'):
+                self.correct = False
+            else:
+                quotes = 0
+                for character in rspnc.split('=')[1]:
+                    if character == '"':
+                        quotes = quotes + 1
+                if quotes != 2:
+                    self.correct = False
+
+        return self.correct
+
     def re_send(self, user, mess):
         """Proxy function"""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
@@ -192,20 +251,15 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         log.received(self.client_address[0], self.client_address[1],
                      received_mess)
         if received_mess.split()[0] == 'REGISTER':
-            try:
+            if self.check_request(received_mess):
                 clt_sip = received_mess.split()[1].split(':')[1]
                 clt_port = int(received_mess.split()[1].split(':')[2])
                 expires_time = float(received_mess.split()[4])
-            except:
-                self.wfile.write(BAD_REQUEST)
-                log.senting(self.client_address[0], self.client_address[1],
-                            decode(BAD_REQUEST))
-            if len(received_mess.split()) == 5:
-                if received_mess.split()[3] == 'Expires:':
+                if len(received_mess.split()) == 5:
                     if expires_time > 0:
                         expires_time = expires_time + time.time()
                         expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                 time.gmtime(expires_time))
+                                                time.gmtime(expires_time))
                         if clt_sip in self.dict_Users:
                             self.add_user(clt_sip, expires_time, clt_port)
                         else:
@@ -214,47 +268,26 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                             else:
                                 nonce = random.randint(10**19, 10**20)
                                 self.dict_Nonce[clt_sip] = nonce
-                                mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                            mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
                             self.wfile.write(mess)
                             log.senting(self.client_address[0],
                                         self.client_address[1],
                                         mess.decode())
                     elif expires_time == 0:
                         self.del_user(clt_sip)
-                else:
-                    self.wfile.write(BAD_REQUEST)
-                    log.senting(self.client_address[0], self.client_address[1],
-                                BAD_REQUEST.decode())
-            elif len(received_mess.split()) == 8:
-                if received_mess.split()[5] == 'Authorization:':
-                    if received_mess.split()[6] == 'Digest':
-                        if received_mess.split()[7].split('=')[0] == 'response':
-                            expires_time = expires_time + time.time()
-                            expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                     time.gmtime(expires_time))
-                            clt_digest = received_mess.split()[7].split('"')[1]
-                            digest = self.get_digest(clt_sip)
-                            if clt_digest == digest:
-                                self.add_user(clt_sip, expires_time, clt_port)
-                            else:
-                                self.wfile.write(UNAUTHORIZED)
-                                log.senting(self.client_address[0],
-                                            self.client_address[1],
-                                            UNAUTHORIZED.decode())
-                        else:
-                            self.wfile.write(BAD_REQUEST)
-                            log.senting(self.client_address[0],
-                                        self.client_address[1],
-                                        BAD_REQUEST.decode())
+                elif len(received_mess.split()) == 8:
+                    expires_time = expires_time + time.time()
+                    expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                            time.gmtime(expires_time))
+                    clt_digest = received_mess.split()[7].split('"')[1]
+                    digest = self.get_digest(clt_sip)
+                    if clt_digest == digest:
+                        self.add_user(clt_sip, expires_time, clt_port)
                     else:
-                        self.wfile.write(BAD_REQUEST)
+                        self.wfile.write(UNAUTHORIZED)
                         log.senting(self.client_address[0],
                                     self.client_address[1],
-                                    BAD_REQUEST.decode())
-                else:
-                    self.wfile.write(BAD_REQUEST)
-                    log.senting(self.client_address[0], self.client_address[1],
-                                BAD_REQUEST.decode())
+                                    UNAUTHORIZED.decode())
             else:
                 self.wfile.write(BAD_REQUEST)
                 log.senting(self.client_address[0], self.client_address[1],
@@ -275,10 +308,13 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
 
 
 if __name__ == "__main__":
+
     parser = make_parser()
     cHandler = XMLHandler()
     parser.setContentHandler(cHandler)
-    # Forming first request
+    # Pick config of keyboard and fich.
+    # Listens at address in a port defined by the user
+    # and calls the SIPRegisterProxyHandler class to manage the request
     try:
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
@@ -293,6 +329,8 @@ if __name__ == "__main__":
         log = WriterLog()
     except (IndexError, ValueError, FileNotFoundError):
         sys.exit('Usage: python3 proxy_registar.py config.')
+    except OSError:
+        sys.exit('Address already in use')
 
     try:
         print('Server ' + SERVER_NAME + ' listening at port ' +

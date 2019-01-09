@@ -11,15 +11,23 @@ from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
 from proxy_registar import XMLHandler, WriterLog
 
-# Procedure to send messages
+
+TRYNING = 'SIP/2.0 100 Trying'
+RING = 'SIP/2.0 180 Ring'
+OK = 'SIP/2.0 200 OK'
+UNAUTHORIZED = 'SIP/2.0 401 Unauthorized'
+
 def send_mess(Request):
+    """Procedure to send messages"""
     Request = ''.join(Request)
     my_socket.send(bytes(Request, 'utf-8'))
     log.senting(PROXY_IP, PROXY_PORT, Request)
 
 def send_rtp(server_ip, server_port):
+    """Procedure to send media by RTP"""
     ToRun = 'mp32rtp -i ' + server_ip + ' -p ' + server_port + ' < ' + MEDIA
     print('Running: ', ToRun)
+    log.senting_rtp(server_ip, server_port, MEDIA)
     os.system(ToRun)
 
 
@@ -79,11 +87,12 @@ if __name__ == '__main__':
             log.finishing()
             exit('Error: No server listening at ' + PROXY_IP +
                  ' port ' + str(PROXY_PORT))
-        # Reciving response, and asking with a new response (if applicable)
+        # Reciving response, and reply with a new response (if applicable)
         data = my_socket.recv(1024)
         response = data.decode('utf-8')
         log.received(PROXY_IP, PROXY_PORT, response)
-        if response.split()[1] == '401':
+
+        if response.split('\r\n')[0] == UNAUTHORIZED:
             nonce = response.split('"')[1]
             h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
             h.update(bytes(nonce,'utf-8'))
@@ -95,9 +104,12 @@ if __name__ == '__main__':
             Request.append('Authorization: Digest response="' + digest +
                            '"\r\n')
             send_mess(Request)
-        elif response.split()[1] == '100':
-            if response.split()[4] == '180':
-                if response.split()[7] == '200':
+            data = my_socket.recv(1024)
+            response = data.decode('utf-8')
+            log.received(PROXY_IP, PROXY_PORT, response)
+        elif response.split('\r\n')[0] == TRYNING:
+            if response.split('\r\n')[2] == RING:
+                if response.split('\r\n')[4] == OK:
                     Request = []
                     Request.append('ACK sip:' + OPTION + ' SIP/2.0\r\n')
                     send_mess(Request)
@@ -106,5 +118,5 @@ if __name__ == '__main__':
                     server_port = response.split()[17]
                     send_rtp(server_ip, server_port)
         print('Ending socket...')
-        log.finishing()
+    log.finishing()
     print('Socket done.')

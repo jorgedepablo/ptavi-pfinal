@@ -21,7 +21,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
 
     correct = True
     dict_RTP = {}
-    #ESTA PARTE REPASASR CUANDO ACABE PRINCIPAR
+
     def check_request(self, mess):
         """Check if the SIP request is correctly formed."""
         valid_characters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j',
@@ -35,7 +35,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         if mess.split()[0] == 'INVITE':
             try:
                 user = mess.split()[1]
-                version = mess.split()[2]
+                sip = mess.split()[2]
                 content_type = mess.split()[3]
                 app = mess.split()[4]
                 version = mess.split()[5]
@@ -48,7 +48,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             except (IndexError, ValueError):
                 self.correct = False
 
-            if len(mess.split()) != 11:
+            print(len(mess.split()))
+            if len(mess.split()) != 13:
                 self.correct = False
             if not user.startswith('sip:'):
                     self.correct = False
@@ -61,7 +62,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                         at = at + 1
                 if at != 1:
                     self.correct = False
-            if version != 'SIP/2.0':
+            if sip != 'SIP/2.0':
+                print(version)
                 self.correct = False
             if content_type != 'Content-Type:':
                 self.correct = False
@@ -90,6 +92,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 self.correct = False
             if rtp != 'RTP':
                 self.correct = False
+
         if  mess.split()[0] == ('ACK', 'BYE'):
             try:
                 user = mess.split()[1]
@@ -112,6 +115,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                     self.correct = False
             if version != 'SIP/2.0':
                 self.correct = False
+        return self.correct
 
     def handle(self):
         """Handle method of the server class."""
@@ -121,7 +125,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         received_mess = ''.join(received_mess)
         log.received(self.client_address[0], self.client_address[1],
                      received_mess)
-        if check_request(received_mess):
+        if self.check_request(received_mess):
             if received_mess.split()[0] == 'INVITE':
                     organizer_ip = received_mess[7]
                     organizer_port = received_mess.split()[11]
@@ -152,7 +156,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 ToRun = ('mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port +
                          ' < ' + MEDIA)
                 print('Running: ', ToRun)
-                log.send_rtp(organizer_ip, organizer_port, MEDIA)
+                log.senting_rtp(organizer_ip, organizer_port, MEDIA)
                 os.system(ToRun)
             else:
                 self.wfile.write(NOT_ALLOWED)
@@ -168,6 +172,9 @@ if __name__ == "__main__":
     parser = make_parser()
     cHandler = XMLHandler()
     parser.setContentHandler(cHandler)
+    # Pick config of keyboard and fich.
+    # Listens at address in a port defined by the user
+    # and calls the EchoHandler class to manage the request
     try:
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
@@ -180,14 +187,15 @@ if __name__ == "__main__":
         FICH_LOG = cHandler.config['log_path']
         MEDIA = cHandler.config['audio_path']
         log = WriterLog()
+        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
     except (IndexError, ValueError):
         sys.exit('Usage: python uaserver.py config')
+    except OSError:
+        sys.exit('Address already in use')
 
-    """Create echo server and listening."""
-    log.starting()
-    serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
-    print('Listening...')
     try:
+        print('Listening...')
+        log.starting()
         serv.serve_forever()
     except KeyboardInterrupt:
         log.finishing()
