@@ -18,6 +18,7 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
 class EchoHandler(socketserver.DatagramRequestHandler):
+    """Echo handler server class."""
 
     correct = True
     dict_RTP = {}
@@ -48,7 +49,6 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             except (IndexError, ValueError):
                 self.correct = False
 
-            print(len(mess.split()))
             if len(mess.split()) != 13:
                 self.correct = False
             if not user.startswith('sip:'):
@@ -63,7 +63,6 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 if at != 1:
                     self.correct = False
             if sip != 'SIP/2.0':
-                print(version)
                 self.correct = False
             if content_type != 'Content-Type:':
                 self.correct = False
@@ -93,7 +92,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             if rtp != 'RTP':
                 self.correct = False
 
-        if  mess.split()[0] == ('ACK', 'BYE'):
+        if mess.split()[0] == ('ACK', 'BYE'):
             try:
                 user = mess.split()[1]
                 version = mess.split()[2]
@@ -127,7 +126,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                      received_mess)
         if self.check_request(received_mess):
             if received_mess.split()[0] == 'INVITE':
-                    organizer_ip = received_mess[7]
+                    organizer_ip = received_mess.split()[7]
                     organizer_port = received_mess.split()[11]
                     self.dict_RTP['1'] = (organizer_ip, organizer_port)
                     self.wfile.write(TRYNING)
@@ -153,8 +152,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             elif received_mess.split()[0] == 'ACK':
                 organizer_ip = self.dict_RTP['1'][0]
                 organizer_port = self.dict_RTP['1'][1]
-                ToRun = ('mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port +
-                         ' < ' + MEDIA)
+                ToRun = ('./mp32rtp -i ' + organizer_ip + ' -p ' +
+                         organizer_port + ' < ' + MEDIA)
                 print('Running: ', ToRun)
                 log.senting_rtp(organizer_ip, organizer_port, MEDIA)
                 os.system(ToRun)

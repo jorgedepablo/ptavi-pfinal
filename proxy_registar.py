@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-#Nick Fury Server
+# Nick Fury Server
 """Class (and main program) for proxy register server in UDP simple."""
 
 import socketserver
@@ -23,28 +23,34 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
 class WriterLog():
-    """Class for write log file"""
+    """Class to write in log file."""
+
     def __init__(self):
+        """Import the paht of the main."""
         from __main__ import FICH_LOG as log
         self.log = log
 
     def wrt_log(self, status):
-         with open(self.log, 'a') as log_file:
-             log_file.write(status)
+        """Write the status in file."""
+        with open(self.log, 'a') as log_file:
+            log_file.write(status)
 
     def starting(self):
-         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                      time.gmtime(time.time()))
-         status = (current_time + ' Starting...\r\n')
-         self.wrt_log(status)
+        """FOR Starting."""
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
+        status = (current_time + ' Starting...\r\n')
+        self.wrt_log(status)
 
     def finishing(self):
+        """For finishing."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         status = (current_time + ' Finishing.\r\n')
         self.wrt_log(status)
 
     def senting(self, ip, port, content):
+        """For send messages."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         content = content.replace('\r\n', ' ')
@@ -53,6 +59,7 @@ class WriterLog():
         self.wrt_log(status)
 
     def received(self, ip, port, content):
+        """For received messages."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         content = content.replace('\r\n', ' ')
@@ -61,6 +68,7 @@ class WriterLog():
         self.wrt_log(status)
 
     def senting_rtp(self, ip, port, media):
+        """For send rtp media."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         status = (current_time + ' Senting to ' + ip + ':' + str(port) +
@@ -68,6 +76,7 @@ class WriterLog():
         self.wrt_log(status)
 
     def conexion_refused(self, ip, port):
+        """For ConnectionRefusedError."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         status = ('Error: No server listening at ' + ip + ' port ' +
@@ -76,8 +85,10 @@ class WriterLog():
 
 
 class XMLHandler(ContentHandler):
-    """Class for pick config of XML"""
+    """Class for extract tags of XML fich."""
+
     def __init__(self):
+        """Create a dictionary whit config file tags."""
         self.attrsDict = {'account': ['username', 'passwd'],
                           'uaserver': ['ip', 'port'],
                           'rtpaudio': ['port'],
@@ -89,11 +100,13 @@ class XMLHandler(ContentHandler):
         self.config = {}
 
     def startElement(self, name, attrs):
+        """If tag in the dictionary copy in other dictionary."""
         if name in self.attrsDict:
             for tag in self.attrsDict[name]:
                 self.config[name + '_' + tag] = attrs.get(tag, '')
 
     def get_tags(self):
+        """Return the second dictionary."""
         return self.config
 
 
@@ -107,19 +120,22 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
 
     def add_user(self, sip_address, expires_time, port):
         """Add users to the dictionary."""
-        current_time = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(time.time()))
+        current_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                     time.gmtime(time.time()))
         self.dict_Users[sip_address] = (self.client_address[0], str(port),
                                         current_time, expires_time)
         self.register2json()
         self.wfile.write(OK)
-        log.senting(self.client_address[0], self.client_address[1], OK.decode())
+        log.senting(self.client_address[0], self.client_address[1],
+                    OK.decode())
 
     def del_user(self, sip_address):
         """Delete users of the dictionary."""
         del self.dict_Users[sip_address]
         self.register2json()
         self.wfile.write(OK)
-        log.senting(self.client_address[0], self.client_address[1], OK.decode())
+        log.senting(self.client_address[0], self.client_address[1],
+                    OK.decode())
 
     def check_expires(self):
         """Check if the users have expired, delete them of the dictionary."""
@@ -146,18 +162,18 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
             pass
 
     def json2passwd(self):
-        """Copy the data of passwords in the dictionary"""
+        """Copy the data of passwords in the dictionary."""
         with open(DATA_PASSWD, 'r') as json_file:
             self.dict_Passwd = json.load(json_file)
 
     def get_digest(self, user):
-        """Get the digest with the passwords of dictionary"""
+        """Get the digest with the passwords of dictionary."""
         digest = 0
         nonce = str(self.dict_Nonce[user])
         if user in self.dict_Passwd:
             passwd = self.dict_Passwd[user]
             h = hashlib.sha1(bytes(passwd + '\n', 'utf-8'))
-            h.update(bytes(nonce,'utf-8'))
+            h.update(bytes(nonce, 'utf-8'))
             digest = h.hexdigest()
         return digest
 
@@ -206,7 +222,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
 
             if athr != 'Authorization:':
                 self.correct = False
-            if dig!= 'Digest':
+            if dig != 'Digest':
                 self.correct = False
             if not rspnc.startswith('response="'):
                 self.correct = False
@@ -221,23 +237,22 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         return self.correct
 
     def re_send(self, user, mess):
-        """Proxy function"""
+        """Proxy function."""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
             my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             ip = self.dict_Users[user][0]
-            port =  self.dict_Users[user][1]
+            port = self.dict_Users[user][1]
             try:
                 my_socket.connect((ip, int(port)))
                 my_socket.send(bytes(mess, 'utf-8'))
                 log.senting(ip, port, mess)
-                if  not ''.join(mess).split()[0] == 'ACK':
+                if not ''.join(mess).split()[0] == 'ACK':
                     data = my_socket.recv(1024)
                     response = data.decode('utf8')
                     log.received(ip, port, response)
                     self.wfile.write(data)
             except ConnectionRefusedError:
                 log.conexion_refused(ip, port)
-
 
     def handle(self):
         """Handle method of the server class."""
@@ -256,38 +271,32 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 clt_port = int(received_mess.split()[1].split(':')[2])
                 expires_time = float(received_mess.split()[4])
                 if len(received_mess.split()) == 5:
-                    if expires_time > 0:
-                        expires_time = expires_time + time.time()
-                        expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                time.gmtime(expires_time))
-                        if clt_sip in self.dict_Users:
-                            self.add_user(clt_sip, expires_time, clt_port)
-                        else:
-                            if clt_sip in self.dict_Nonce:
-                                nonce = self.dict_Nonce[clt_sip]
-                            else:
-                                nonce = random.randint(10**19, 10**20)
-                                self.dict_Nonce[clt_sip] = nonce
-                            mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
-                            self.wfile.write(mess)
-                            log.senting(self.client_address[0],
-                                        self.client_address[1],
-                                        mess.decode())
-                    elif expires_time == 0:
-                        self.del_user(clt_sip)
+                    if clt_sip in self.dict_Nonce:
+                        nonce = self.dict_Nonce[clt_sip]
+                    else:
+                        nonce = random.randint(10**19, 10**20)
+                        self.dict_Nonce[clt_sip] = nonce
+                    mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                    self.wfile.write(mess)
+                    log.senting(self.client_address[0], self.client_address[1],
+                                mess.decode())
                 elif len(received_mess.split()) == 8:
-                    expires_time = expires_time + time.time()
-                    expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                            time.gmtime(expires_time))
                     clt_digest = received_mess.split()[7].split('"')[1]
                     digest = self.get_digest(clt_sip)
                     if clt_digest == digest:
-                        self.add_user(clt_sip, expires_time, clt_port)
+                        if expires_time > 0:
+                            expires_time = expires_time + time.time()
+                            expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
+                                                         time.gmtime(expires_time))
+                            self.add_user(clt_sip, expires_time, clt_port)
+                        elif expires_time == 0:
+                            self.del_user(clt_sip)
                     else:
-                        self.wfile.write(UNAUTHORIZED)
+                        mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                        self.wfile.write(mess)
                         log.senting(self.client_address[0],
                                     self.client_address[1],
-                                    UNAUTHORIZED.decode())
+                                    mess.decode())
             else:
                 self.wfile.write(BAD_REQUEST)
                 log.senting(self.client_address[0], self.client_address[1],

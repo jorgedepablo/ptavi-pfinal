@@ -17,15 +17,17 @@ RING = 'SIP/2.0 180 Ring'
 OK = 'SIP/2.0 200 OK'
 UNAUTHORIZED = 'SIP/2.0 401 Unauthorized'
 
+
 def send_mess(Request):
-    """Procedure to send messages"""
+    """Procedure to send messages."""
     Request = ''.join(Request)
     my_socket.send(bytes(Request, 'utf-8'))
     log.senting(PROXY_IP, PROXY_PORT, Request)
 
+
 def send_rtp(server_ip, server_port):
-    """Procedure to send media by RTP"""
-    ToRun = 'mp32rtp -i ' + server_ip + ' -p ' + server_port + ' < ' + MEDIA
+    """Procedure to send media by RTP."""
+    ToRun = './mp32rtp -i ' + server_ip + ' -p ' + server_port + ' < ' + MEDIA
     print('Running: ', ToRun)
     log.senting_rtp(server_ip, server_port, MEDIA)
     os.system(ToRun)
@@ -60,7 +62,7 @@ if __name__ == '__main__':
     if METHOD == 'REGISTER':
         Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) +
                        ' SIP/2.0\r\n')
-        Request.append('Expires: ' + OPTION + '\r\n')
+        Request.append('Expires: ' + OPTION + '\r\n\r\n')
     elif METHOD == 'INVITE':
         Request.append('INVITE sip:' + OPTION + ' SIP/2.0\r\n')
         Request.append('Content-Type: application/sdp\r\n\r\n')
@@ -68,9 +70,9 @@ if __name__ == '__main__':
         Request.append('o=' + LOGIN + ' ' + MY_IP + '\r\n')
         Request.append('s=avengers_assemmble\r\n')
         Request.append('t=0\r\n')
-        Request.append('m=audio ' + str(RTP_PORT) + ' RTP\r\n')
+        Request.append('m=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
     elif METHOD == 'BYE':
-        Request.append('BYE sip:' + OPTION + ' SIP/2.0\r\n')
+        Request.append('BYE sip:' + OPTION + ' SIP/2.0\r\n\r\n')
     else:
         log.finishing()
         exit('Usage: method not avaleible')
@@ -95,14 +97,14 @@ if __name__ == '__main__':
         if response.split('\r\n')[0] == UNAUTHORIZED:
             nonce = response.split('"')[1]
             h = hashlib.sha1(bytes(PASSWD + '\n', 'utf-8'))
-            h.update(bytes(nonce,'utf-8'))
+            h.update(bytes(nonce, 'utf-8'))
             digest = h.hexdigest()
             Request = []
             Request.append('REGISTER sip:' + LOGIN + ':' + str(MY_PORT) +
-                           ' SIP/2.0\r\n')
+                           ' SIP/2.0\r\n\r\n')
             Request.append('Expires: ' + OPTION + '\r\n')
             Request.append('Authorization: Digest response="' + digest +
-                           '"\r\n')
+                           '"\r\n\r\n')
             send_mess(Request)
             data = my_socket.recv(1024)
             response = data.decode('utf-8')
@@ -111,7 +113,7 @@ if __name__ == '__main__':
             if response.split('\r\n')[2] == RING:
                 if response.split('\r\n')[4] == OK:
                     Request = []
-                    Request.append('ACK sip:' + OPTION + ' SIP/2.0\r\n')
+                    Request.append('ACK sip:' + OPTION + ' SIP/2.0\r\n\r\n')
                     send_mess(Request)
                     server_name = response.split()[12].split('=')[1]
                     server_ip = response.split()[13]
