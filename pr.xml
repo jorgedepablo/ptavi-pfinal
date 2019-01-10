@@ -1,5 +1,5 @@
 <config>
-  <server name="AvengersServer" ip="localhost" port="5555"/>
+  <server name="AvengersServer" ip="127.0.0.1" port="5555"/>
   <database path="users.json" passwdpath="passwords.json"/>
   <log path="proxy_registar.log"/>
 </config>
