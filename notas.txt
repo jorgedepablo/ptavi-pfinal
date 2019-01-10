@@ -1,0 +1,8 @@
+La consistencia frente a valores erroneos también la he implementado el los useragets
+para cuando cojan las ip mal formadas en los .xml, y se sale del programa imprimiendo por pantalla el error.
+Tambien he implementado que se pueda finalizar el server y proxy con ^C capturando la excepcion y registrandolo en el log.
+El registrar proxy analiza los mensajes REGISTER y el UAserver el restO
+de peticiones SIP que manejamos(INVITES, BYE, ACK)
+El codigo ha sido demasiado largo, pues puede haber muchisimos errores, se que estaria mejor en un programa complementario
+que su unica funcion fuera checkear las peticiones, pero con poco tiempo era mucho jaleo.
+Pero captura todos los errors(o eso creo) y contesta con BAD REQUEST.
