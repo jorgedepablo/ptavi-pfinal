@@ -1,0 +1,3 @@
+1: Restablecer usuarios registrados.
+2: integracion de cvlc en el uaclient.
+3: consistencia frente a valores erroneos. 
