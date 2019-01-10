@@ -29,8 +29,10 @@ def send_rtp(server_ip, server_port):
     """Procedure to send media by RTP."""
     ToRun = './mp32rtp -i ' + server_ip + ' -p ' + server_port
     ToRun += ' < ' + MEDIA
+    ToListen = 'cvlc rtp://@' + server_ip + ':' + server_port + '&'
     print('Running: ', ToRun)
     log.senting_rtp(server_ip, server_port, MEDIA)
+    os.system(ToListen)
     os.system(ToRun)
 
 
