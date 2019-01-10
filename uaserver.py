@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 """Class (and main program) for echo register server in UDP simple."""
 
-import socketserver
 import sys
 import os
 from xml.sax import make_parser
-from xml.sax.handler import ContentHandler
+import socketserver
 from proxy_registar import XMLHandler, WriterLog, CheckIP
 
 
@@ -42,7 +41,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 app = mess.split()[4]
                 version = mess.split()[5]
                 organizer = mess.split()[6]
-                ip = mess.split()[7]
+                _ip = mess.split()[7]
                 sesion = mess.split()[8]
                 time_sesion = mess.split()[9]
                 mult = mess.split()[10]
@@ -50,21 +49,20 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 rtp = mess.split()[12]
             except (IndexError, ValueError):
                 self.correct = False
-
-            if not checkIP.check_ip(ip):
+            if not CHECKIP.check_ip(_ip):
                 self.correct = False
             if len(mess.split()) != 13:
                 self.correct = False
             if not user.startswith('sip:'):
-                    self.correct = False
+                self.correct = False
             else:
-                at = 0
+                _at = 0
                 for character in user.split(':')[1]:
                     if character not in valid_characters:
                         self.correct = False
                     if character == '@':
-                        at = at + 1
-                if at != 1:
+                        _at = _at + 1
+                if _at != 1:
                     self.correct = False
             if sip != 'SIP/2.0':
                 self.correct = False
@@ -77,13 +75,13 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             if not organizer.startswith('o='):
                 self.correct = False
             else:
-                at = 0
+                _at = 0
                 for character in organizer.split('=')[1]:
                     if character not in valid_characters:
                         self.correct = False
                     if character == '@':
-                        at = at + 1
-                if at != 1:
+                        _at = _at + 1
+                if _at != 1:
                     self.correct = False
             if not sesion.startswith('s='):
                 self.correct = False
@@ -106,16 +104,18 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             if len(mess.split()) != 3:
                 self.correct = False
             if not user.startswith('sip:'):
-                    self.correct = False
+                self.correct = False
             else:
-                at = 0
+                _at = 0
                 for character in user.split(':')[1]:
                     if character not in valid_characters:
                         self.correct = False
                     if character == '@':
-                        at = at + 1
-                if at != 1:
+                        _at = _at + 1
+                if _at != 1:
                     self.correct = False
+            if time_sesion != 't=0':
+                self.correct = False
             if version != 'SIP/2.0':
                 self.correct = False
         return self.correct
@@ -126,81 +126,75 @@ class EchoHandler(socketserver.DatagramRequestHandler):
         for line in self.rfile:
             received_mess.append(line.decode('utf-8'))
         received_mess = ''.join(received_mess)
-        log.received(self.client_address[0], self.client_address[1],
+        LOG.received(self.client_address[0], self.client_address[1],
                      received_mess)
         if self.check_request(received_mess):
             if received_mess.split()[0] == 'INVITE':
-                    organizer_ip = received_mess.split()[7]
-                    organizer_port = received_mess.split()[11]
-                    self.dict_RTP['1'] = (organizer_ip, organizer_port)
-                    self.wfile.write(TRYNING)
-                    log.senting(self.client_address[0], self.client_address[1],
-                                TRYNING.decode())
-                    self.wfile.write(RING)
-                    log.senting(self.client_address[0], self.client_address[1],
-                                RING.decode())
-                    self.wfile.write(OK)
-                    log.senting(self.client_address[0], self.client_address[1],
-                                OK.decode())
-                    SDP = ('Content-Type: application/sdp\r\n\r\n' +
-                           'v=0\r\n' + 'o=' + LOGIN + ' ' + server_ip +
-                           '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
-                           'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
-                    self.wfile.write(bytes(SDP, 'utf-8'))
-                    log.senting(self.client_address[0], self.client_address[1],
-                                SDP)
+                organizer_ip = received_mess.split()[7]
+                organizer_port = received_mess.split()[11]
+                self.dict_RTP['1'] = (organizer_ip, organizer_port)
+                self.wfile.write(TRYNING)
+                LOG.senting(self.client_address[0], self.client_address[1],
+                            TRYNING.decode())
+                self.wfile.write(RING)
+                LOG.senting(self.client_address[0], self.client_address[1],
+                            RING.decode())
+                self.wfile.write(OK)
+                LOG.senting(self.client_address[0], self.client_address[1],
+                            OK.decode())
+                sdp = ('Content-Type: application/sdp\r\n\r\n' +
+                       'v=0\r\n' + 'o=' + LOGIN + ' ' + SERVER_IP +
+                       '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
+                       'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
+                self.wfile.write(bytes(sdp, 'utf-8'))
+                LOG.senting(self.client_address[0], self.client_address[1],
+                            sdp)
             elif received_mess.split()[0] == 'BYE':
                 self.wfile.write(OK)
-                log.senting(self.client_address[0], self.client_address[1],
+                LOG.senting(self.client_address[0], self.client_address[1],
                             OK.decode())
             elif received_mess.split()[0] == 'ACK':
                 organizer_ip = self.dict_RTP['1'][0]
                 organizer_port = self.dict_RTP['1'][1]
-                ToRun = './mp32rtp -i ' + organizer_ip + ' -p '
-                ToRun += organizer_port
-                ToRun += ' < ' + MEDIA
-                print('Running: ', ToRun)
-                log.senting_rtp(organizer_ip, organizer_port, MEDIA)
-                os.system(ToRun)
+                to_run = './mp32rtp -i ' + organizer_ip + ' -p '
+                to_run += organizer_port
+                to_run += ' < ' + MEDIA
+                print('Running: ', to_run)
+                LOG.senting_rtp(organizer_ip, organizer_port, MEDIA)
+                os.system(to_run)
             else:
                 self.wfile.write(NOT_ALLOWED)
-                log.senting(self.client_address[0], self.client_address[1],
+                LOG.senting(self.client_address[0], self.client_address[1],
                             NOT_ALLOWED.decode())
         else:
             self.wfile.write(BAD_REQUEST)
-            log.senting(self.client_address[0], self.client_address[1],
+            LOG.senting(self.client_address[0], self.client_address[1],
                         BAD_REQUEST.decode())
 
 
 if __name__ == "__main__":
-    parser = make_parser()
-    cHandler = XMLHandler()
-    checkIP = CheckIP()
-    parser.setContentHandler(cHandler)
+    PARSER = make_parser()
+    CHANDLER = XMLHandler()
+    CHECKIP = CheckIP()
+    PARSER.setContentHandler(CHANDLER)
     # Pick config of keyboard and fich.
     # Listens at address in a port defined by the user
     # and calls the EchoHandler class to manage the request
     try:
         CONFIG = sys.argv[1]
-        parser.parse(open(CONFIG))
-        LOGIN = cHandler.config['account_username']
-        server_ip = cHandler.config['uaserver_ip']
-        SERVER_PORT = int(cHandler.config['uaserver_port'])
-        RTP_PORT = int(cHandler.config['rtpaudio_port'])
-        proxy_ip = cHandler.config['regproxy_ip']
-        PROXY_PORT = int(cHandler.config['regproxy_port'])
-        FICH_LOG = cHandler.config['log_path']
-        MEDIA = cHandler.config['audio_path']
-        if proxy_ip == '' or proxy_ip == 'localhost':
-            proxy_ip = '127.0.0.1'
-        if server_ip == '' or server_ip == 'localhost':
-            server_ip = '127.0.0.1'
-        if not checkIP.check_ip(proxy_ip):
+        PARSER.parse(open(CONFIG))
+        LOGIN = CHANDLER.config['account_username']
+        SERVER_IP = CHANDLER.config['uaserver_ip']
+        SERVER_PORT = int(CHANDLER.config['uaserver_port'])
+        RTP_PORT = int(CHANDLER.config['rtpaudio_port'])
+        FICH_LOG = CHANDLER.config['log_path']
+        MEDIA = CHANDLER.config['audio_path']
+        if SERVER_IP == '' or SERVER_IP == 'localhost':
+            SERVER_IP = '127.0.0.1'
+        if not CHECKIP.check_ip(SERVER_IP):
             sys.exit('Invalid IP addess in config file')
-        if not checkIP.check_ip(server_ip):
-            sys.exit('Invalid IP addess in config file')
-        log = WriterLog()
-        serv = socketserver.UDPServer((server_ip, SERVER_PORT),
+        LOG = WriterLog()
+        SERV = socketserver.UDPServer((SERVER_IP, SERVER_PORT),
                                       EchoHandler)
     except (IndexError, ValueError):
         sys.exit('Usage: python uaserver.py config')
@@ -208,9 +202,9 @@ if __name__ == "__main__":
         sys.exit('Address already in use')
 
     try:
-        print('Listening...')
-        log.starting()
-        serv.serve_forever()
+        print ('Listening...')
+        LOG.starting()
+        SERV.serve_forever()
     except KeyboardInterrupt:
-        log.finishing()
-        print('  Server interrupt')
+        LOG.finishing()
+        print ('  Server interrupt')

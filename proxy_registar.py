@@ -3,15 +3,15 @@
 # Nick Fury Server
 """Class (and main program) for proxy register server in UDP simple."""
 
-import socketserver
-import socket
 import sys
 import time
 import json
 import random
 import hashlib
 from xml.sax import make_parser
+import socket
 from xml.sax.handler import ContentHandler
+import socketserver
 
 TRYNING = b'SIP/2.0 100 Trying\r\n\r\n'
 RING = b'SIP/2.0 180 Ring\r\n\r\n'
@@ -24,23 +24,23 @@ NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 class CheckIP():
     """Class to check if ip addess is correct."""
-    
+
     def __init__(self):
         """Init the boolean."""
         self.correct = True
 
-    def check_ip(self, ip):
+    def check_ip(self, _ip):
         """Check if ip is valid."""
         valid_ip = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.']
         rang = list(range(256))
         self.correct = True
         try:
-            first = int(ip.split('.')[0])
-            second = int(ip.split('.')[1])
-            third = int(ip.split('.')[2])
-            fourth = int(ip.split('.')[3])
+            first = int(_ip.split('.')[0])
+            second = int(_ip.split('.')[1])
+            third = int(_ip.split('.')[2])
+            fourth = int(_ip.split('.')[3])
             dot = 0
-            for character in ip:
+            for character in _ip:
                 if character not in valid_ip:
                     self.correct = False
                 if character == '.':
@@ -89,38 +89,38 @@ class WriterLog():
         status = (current_time + ' Finishing.\r\n')
         self.wrt_log(status)
 
-    def senting(self, ip, port, content):
+    def senting(self, _ip, port, content):
         """For send messages."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         content = content.replace('\r\n', ' ')
-        status = (current_time + ' Sent to ' + ip + ':' + str(port) +
+        status = (current_time + ' Sent to ' + _ip + ':' + str(port) +
                   ': ' + content + '\r\n')
         self.wrt_log(status)
 
-    def received(self, ip, port, content):
+    def received(self, _ip, port, content):
         """For received messages."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
         content = content.replace('\r\n', ' ')
-        status = (current_time + ' Received from ' + ip + ':' + str(port) +
+        status = (current_time + ' Received from ' + _ip + ':' + str(port) +
                   ': ' + content + '\r\n')
         self.wrt_log(status)
 
-    def senting_rtp(self, ip, port, media):
+    def senting_rtp(self, _ip, port, media):
         """For send rtp media."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
-        status = (current_time + ' Senting to ' + ip + ':' + str(port) +
+        status = (current_time + ' Senting to ' + _ip + ':' + str(port) +
                   ' file: ' + media + ' by RTP\r\n')
         self.wrt_log(status)
 
-    def conexion_refused(self, ip, port):
+    def conexion_refused(self, _ip, port):
         """For ConnectionRefusedError."""
         current_time = time.strftime('%Y-%m-%d %H:%M:%S',
                                      time.gmtime(time.time()))
-        status = ('Error: No server listening at ' + ip + ' port ' +
-                  str(port) + '\r\n')
+        status = (current_time + ' Error: No server listening at ' + _ip +
+                  ' port ' + str(port) + '\r\n')
         self.wrt_log(status)
 
 
@@ -166,7 +166,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                                         current_time, expires_time)
         self.register2json()
         self.wfile.write(OK)
-        log.senting(self.client_address[0], self.client_address[1],
+        LOG.senting(self.client_address[0], self.client_address[1],
                     OK.decode())
 
     def del_user(self, sip_address):
@@ -174,7 +174,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         del self.dict_Users[sip_address]
         self.register2json()
         self.wfile.write(OK)
-        log.senting(self.client_address[0], self.client_address[1],
+        LOG.senting(self.client_address[0], self.client_address[1],
                     OK.decode())
 
     def check_expires(self):
@@ -240,13 +240,13 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         if not address.startswith('sip:'):
             self.correct = False
         else:
-            at = 0
+            _at = 0
             for character in address.split(':')[1]:
                 if character not in valid_characters:
                     self.correct = False
                 if character == '@':
-                    at = at + 1
-            if at != 1:
+                    _at = _at + 1
+            if _at != 1:
                 self.correct = False
         if version != 'SIP/2.0':
             self.correct = False
@@ -281,19 +281,19 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         """Proxy function."""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as my_socket:
             my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            ip = self.dict_Users[user][0]
+            _ip = self.dict_Users[user][0]
             port = self.dict_Users[user][1]
             try:
-                my_socket.connect((ip, int(port)))
+                my_socket.connect((_ip, int(port)))
                 my_socket.send(bytes(mess, 'utf-8'))
-                log.senting(ip, port, mess)
-                if not ''.join(mess).split()[0] == 'ACK':
+                LOG.senting(_ip, port, mess)
+                if ''.join(mess).split()[0] != 'ACK':
                     data = my_socket.recv(1024)
                     response = data.decode('utf8')
-                    log.received(ip, port, response)
+                    LOG.received(_ip, port, response)
                     self.wfile.write(data)
-            except ConnectionRefusedError:
-                log.conexion_refused(ip, port)
+            except OSError:
+                LOG.conexion_refused(_ip, port)
 
     def handle(self):
         """Handle method of the server class."""
@@ -304,7 +304,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
         for line in self.rfile:
             received_mess.append(line.decode('utf-8'))
         received_mess = ''.join(received_mess)
-        log.received(self.client_address[0], self.client_address[1],
+        LOG.received(self.client_address[0], self.client_address[1],
                      received_mess)
         if received_mess.split()[0] == 'REGISTER':
             if self.check_request(received_mess):
@@ -321,7 +321,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                     mess += b'WWW Authenticate: Digest nonce="'
                     mess += bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
                     self.wfile.write(mess)
-                    log.senting(self.client_address[0], self.client_address[1],
+                    LOG.senting(self.client_address[0], self.client_address[1],
                                 mess.decode())
                 elif len(received_mess.split()) == 8:
                     clt_digest = received_mess.split()[7].split('"')[1]
@@ -340,12 +340,12 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                         mess += b'WWW Authenticate: Digest nonce="'
                         mess += bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
                         self.wfile.write(mess)
-                        log.senting(self.client_address[0],
+                        LOG.senting(self.client_address[0],
                                     self.client_address[1],
                                     mess.decode())
             else:
                 self.wfile.write(BAD_REQUEST)
-                log.senting(self.client_address[0], self.client_address[1],
+                LOG.senting(self.client_address[0], self.client_address[1],
                             BAD_REQUEST.decode())
 
         elif received_mess.split()[0] == 'INVITE' or 'BYE' or 'ACK':
@@ -354,40 +354,40 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                 self.re_send(user_address, received_mess)
             else:
                 self.wfile.write(NOT_FOUND)
-                log.senting(self.client_address[0], self.client_address[1],
+                LOG.senting(self.client_address[0], self.client_address[1],
                             NOT_FOUND.decode())
         else:
             self.wfile.write(NOT_ALLOWED)
-            log.senting(self.client_address[0], self.client_address[1],
+            LOG.senting(self.client_address[0], self.client_address[1],
                         NOT_ALLOWED.decode())
 
 
 if __name__ == "__main__":
 
-    parser = make_parser()
-    cHandler = XMLHandler()
-    checkIP = CheckIP()
-    parser.setContentHandler(cHandler)
+    PARSER = make_parser()
+    CHANDLER = XMLHandler()
+    CHECKIP = CheckIP()
+    PARSER.setContentHandler(CHANDLER)
     # Pick config of keyboard and fich.
     # Listens at address in a port defined by the user
     # and calls the SIPRegisterProxyHandler class to manage the request
     try:
         CONFIG = sys.argv[1]
-        parser.parse(open(CONFIG))
-        SERVER_NAME = cHandler.config['server_name']
-        server_ip = cHandler.config['server_ip']
-        SERVER_PORT = int(cHandler.config['server_port'])
-        DATA_USERS = cHandler.config['database_path']
-        DATA_PASSWD = cHandler.config['database_passwdpath']
-        FICH_LOG = cHandler.config['log_path']
-        if server_ip == '' or server_ip == 'localhost':
-            server_ip = '127.0.0.1'
-        if not checkIP.check_ip(server_ip):
+        PARSER.parse(open(CONFIG))
+        SERVER_NAME = CHANDLER.config['server_name']
+        SERVER_IP = CHANDLER.config['server_ip']
+        SERVER_PORT = int(CHANDLER.config['server_port'])
+        DATA_USERS = CHANDLER.config['database_path']
+        DATA_PASSWD = CHANDLER.config['database_passwdpath']
+        FICH_LOG = CHANDLER.config['log_path']
+        if SERVER_IP == '' or SERVER_IP == 'localhost':
+            SERVER_IP = '127.0.0.1'
+        if not CHECKIP.check_ip(SERVER_IP):
             sys.exit('Invalid IP addess in config file')
-        serv = socketserver.UDPServer((server_ip, SERVER_PORT),
+        SERV = socketserver.UDPServer((SERVER_IP, SERVER_PORT),
                                       SIPRegisterProxyHandler)
-        log = WriterLog()
-    except (IndexError, ValueError, FileNotFoundError):
+        LOG = WriterLog()
+    except (IndexError, ValueError):
         sys.exit('Usage: python3 proxy_registar.py config.')
     except OSError:
         sys.exit('Address already in use')
@@ -395,8 +395,8 @@ if __name__ == "__main__":
     try:
         print('Server ' + SERVER_NAME + ' listening at port ' +
               str(SERVER_PORT) + '...')
-        log.starting()
-        serv.serve_forever()
+        LOG.starting()
+        SERV.serve_forever()
     except KeyboardInterrupt:
-        log.finishing()
+        LOG.finishing()
         print('  Server interrupt')
