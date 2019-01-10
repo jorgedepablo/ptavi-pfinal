@@ -152,8 +152,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             elif received_mess.split()[0] == 'ACK':
                 organizer_ip = self.dict_RTP['1'][0]
                 organizer_port = self.dict_RTP['1'][1]
-                ToRun = ('./mp32rtp -i ' + organizer_ip + ' -p ' +
-                         organizer_port + ' < ' + MEDIA)
+                ToRun = './mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port
+                ToRun += ' < ' + MEDIA
                 print('Running: ', ToRun)
                 log.senting_rtp(organizer_ip, organizer_port, MEDIA)
                 os.system(ToRun)
