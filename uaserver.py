@@ -7,7 +7,7 @@ import sys
 import os
 from xml.sax import make_parser
 from xml.sax.handler import ContentHandler
-from proxy_registar import XMLHandler, WriterLog
+from proxy_registar import XMLHandler, WriterLog, CheckIP
 
 
 TRYNING = b'SIP/2.0 100 Trying\r\n\r\n'
@@ -32,6 +32,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                             'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
                             'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7',
                             '8', '9', '_', '-', '.', '@']
+        self.correct = True
 
         if mess.split()[0] == 'INVITE':
             try:
@@ -41,6 +42,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                 app = mess.split()[4]
                 version = mess.split()[5]
                 organizer = mess.split()[6]
+                ip = mess.split()[7]
                 sesion = mess.split()[8]
                 time_sesion = mess.split()[9]
                 mult = mess.split()[10]
@@ -49,6 +51,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             except (IndexError, ValueError):
                 self.correct = False
 
+            if not checkIP.check_ip(ip):
+                self.correct = False
             if len(mess.split()) != 13:
                 self.correct = False
             if not user.startswith('sip:'):
@@ -139,7 +143,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
                     log.senting(self.client_address[0], self.client_address[1],
                                 OK.decode())
                     SDP = ('Content-Type: application/sdp\r\n\r\n' +
-                           'v=0\r\n' + 'o=' + LOGIN + ' ' + SERVER_IP +
+                           'v=0\r\n' + 'o=' + LOGIN + ' ' + server_ip +
                            '\r\n' + 's=avengers_assemmble\r\n' + 't=0\r\n' +
                            'm=audio ' + str(RTP_PORT) + ' RTP\r\n\r\n')
                     self.wfile.write(bytes(SDP, 'utf-8'))
@@ -152,7 +156,8 @@ class EchoHandler(socketserver.DatagramRequestHandler):
             elif received_mess.split()[0] == 'ACK':
                 organizer_ip = self.dict_RTP['1'][0]
                 organizer_port = self.dict_RTP['1'][1]
-                ToRun = './mp32rtp -i ' + organizer_ip + ' -p ' + organizer_port
+                ToRun = './mp32rtp -i ' + organizer_ip + ' -p '
+                ToRun += organizer_port
                 ToRun += ' < ' + MEDIA
                 print('Running: ', ToRun)
                 log.senting_rtp(organizer_ip, organizer_port, MEDIA)
@@ -170,6 +175,7 @@ class EchoHandler(socketserver.DatagramRequestHandler):
 if __name__ == "__main__":
     parser = make_parser()
     cHandler = XMLHandler()
+    checkIP = CheckIP()
     parser.setContentHandler(cHandler)
     # Pick config of keyboard and fich.
     # Listens at address in a port defined by the user
@@ -178,15 +184,24 @@ if __name__ == "__main__":
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
         LOGIN = cHandler.config['account_username']
-        SERVER_IP = cHandler.config['uaserver_ip']
+        server_ip = cHandler.config['uaserver_ip']
         SERVER_PORT = int(cHandler.config['uaserver_port'])
         RTP_PORT = int(cHandler.config['rtpaudio_port'])
-        PROXY_IP = cHandler.config['regproxy_ip']
+        proxy_ip = cHandler.config['regproxy_ip']
         PROXY_PORT = int(cHandler.config['regproxy_port'])
         FICH_LOG = cHandler.config['log_path']
         MEDIA = cHandler.config['audio_path']
+        if proxy_ip == '' or proxy_ip == 'localhost':
+            proxy_ip = '127.0.0.1'
+        if server_ip == '' or server_ip == 'localhost':
+            server_ip = '127.0.0.1'
+        if not checkIP.check_ip(proxy_ip):
+            sys.exit('Invalid IP addess in config file')
+        if not checkIP.check_ip(server_ip):
+            sys.exit('Invalid IP addess in config file')
         log = WriterLog()
-        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT), EchoHandler)
+        serv = socketserver.UDPServer((server_ip, SERVER_PORT),
+                                      EchoHandler)
     except (IndexError, ValueError):
         sys.exit('Usage: python uaserver.py config')
     except OSError:

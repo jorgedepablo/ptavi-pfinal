@@ -22,6 +22,46 @@ NOT_FOUND = b'SIP/2.0 404 User Not Found\r\n\r\n'
 NOT_ALLOWED = b'SIP/2.0 405 Method Not Allowed\r\n\r\n'
 
 
+class CheckIP():
+    """Class to check if ip addess is correct."""
+    
+    def __init__(self):
+        """Init the boolean."""
+        self.correct = True
+
+    def check_ip(self, ip):
+        """Check if ip is valid."""
+        valid_ip = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.']
+        rang = list(range(256))
+        self.correct = True
+        try:
+            first = int(ip.split('.')[0])
+            second = int(ip.split('.')[1])
+            third = int(ip.split('.')[2])
+            fourth = int(ip.split('.')[3])
+            dot = 0
+            for character in ip:
+                if character not in valid_ip:
+                    self.correct = False
+                if character == '.':
+                    dot = dot + 1
+            if dot != 3:
+                self.correct = False
+            if first < 127 or first > 223:
+                self.correct = False
+            else:
+                if second not in rang:
+                    self.correct = False
+                if third not in rang:
+                    self.correct = False
+                if fourth not in rang:
+                    self.correct = False
+        except (IndexError, ValueError):
+            self.correct = False
+
+        return self.correct
+
+
 class WriterLog():
     """Class to write in log file."""
 
@@ -186,6 +226,7 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                             'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
                             'Y', 'Z', '0', '1', '2', '3', '4', '5', '6', '7',
                             '8', '9', '_', '-', '.', '@']
+        self.correct = True
         try:
             address = mess.split()[1]
             version = mess.split()[2]
@@ -276,7 +317,9 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                     else:
                         nonce = random.randint(10**19, 10**20)
                         self.dict_Nonce[clt_sip] = nonce
-                    mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                    mess = UNAUTHORIZED[:-2]
+                    mess += b'WWW Authenticate: Digest nonce="'
+                    mess += bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
                     self.wfile.write(mess)
                     log.senting(self.client_address[0], self.client_address[1],
                                 mess.decode())
@@ -286,13 +329,16 @@ class SIPRegisterProxyHandler(socketserver.DatagramRequestHandler):
                     if clt_digest == digest:
                         if expires_time > 0:
                             expires_time = expires_time + time.time()
-                            expires_time = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                         time.gmtime(expires_time))
+                            expires_time = time.gmtime(expires_time)
+                            format = '%Y-%m-%d %H:%M:%S'
+                            expires_time = time.strftime(format, expires_time)
                             self.add_user(clt_sip, expires_time, clt_port)
                         elif expires_time == 0:
                             self.del_user(clt_sip)
                     else:
-                        mess = UNAUTHORIZED[:-2] + b'WWW Authenticate: Digest nonce="' + bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
+                        mess = UNAUTHORIZED[:-2]
+                        mess += b'WWW Authenticate: Digest nonce="'
+                        mess += bytes(str(nonce), 'utf-8') + b'"\r\n\r\n'
                         self.wfile.write(mess)
                         log.senting(self.client_address[0],
                                     self.client_address[1],
@@ -320,6 +366,7 @@ if __name__ == "__main__":
 
     parser = make_parser()
     cHandler = XMLHandler()
+    checkIP = CheckIP()
     parser.setContentHandler(cHandler)
     # Pick config of keyboard and fich.
     # Listens at address in a port defined by the user
@@ -328,12 +375,16 @@ if __name__ == "__main__":
         CONFIG = sys.argv[1]
         parser.parse(open(CONFIG))
         SERVER_NAME = cHandler.config['server_name']
-        SERVER_IP = cHandler.config['server_ip']
+        server_ip = cHandler.config['server_ip']
         SERVER_PORT = int(cHandler.config['server_port'])
         DATA_USERS = cHandler.config['database_path']
         DATA_PASSWD = cHandler.config['database_passwdpath']
         FICH_LOG = cHandler.config['log_path']
-        serv = socketserver.UDPServer((SERVER_IP, SERVER_PORT),
+        if server_ip == '' or server_ip == 'localhost':
+            server_ip = '127.0.0.1'
+        if not checkIP.check_ip(server_ip):
+            sys.exit('Invalid IP addess in config file')
+        serv = socketserver.UDPServer((server_ip, SERVER_PORT),
                                       SIPRegisterProxyHandler)
         log = WriterLog()
     except (IndexError, ValueError, FileNotFoundError):
